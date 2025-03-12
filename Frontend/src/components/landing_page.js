@@ -95,7 +95,7 @@ export default function LandingPage() {
         <div className="px-4 mx-auto relative sm:px-6 lg:px-8 max-w-7xl">
           <div className="grid items-center grid-cols-1 gap-y-12 lg:grid-cols-2 gap-x-16">
             <div>
-              <h1 className="text-4xl font-bold text-gray-400 sm:text-5xl lg:text-6xl xl:text-7xl">
+              <h1 className=" font-railway text-4xl font-bold text-gray-400 sm:text-5xl lg:text-6xl xl:text-7xl">
                 Collaborative Code Editor
               </h1>
               <p className="mt-4 text-lg font-bold text-gray-400 sm:mt-8">
