@@ -4,6 +4,7 @@ import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 const SignupPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [Username, setUsername] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -22,11 +23,21 @@ const SignupPage = () => {
             />
           </div>
           <div className="mt-12 flex flex-col items-center">
-            <h1 className="text-2xl xl:text-3xl font-extrabold text-gray-400">Sign Up</h1>
+            <h1 className="text-2xl xl:text-3xl font-extrabold text-gray-400">
+              Sign Up
+            </h1>
             <div className="w-full flex-1 mt-8">
               <form className="mx-auto max-w-xs" onSubmit={handleSubmit}>
                 <input
                   className="w-full px-8 py-4 rounded-lg font-medium bg-gray-700 border border-gray-600 placeholder-gray-400 text-sm focus:outline-none focus:border-gray-500 focus:bg-gray-600"
+                  type="Username"
+                  placeholder="Username"
+                  value={Username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+                <input
+                  className="w-full px-8 py-4 rounded-lg font-medium bg-gray-700 border border-gray-600 placeholder-gray-400 text-sm focus:outline-none focus:border-gray-500 focus:bg-gray-600 mt-5"
                   type="email"
                   placeholder="Email"
                   value={email}
@@ -48,7 +59,6 @@ const SignupPage = () => {
                   <span className="ml-3 font-bold text-gray-400">Sign Up</span>
                 </button>
               </form>
-
             </div>
           </div>
         </div>
