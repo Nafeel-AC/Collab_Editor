@@ -1,5 +1,4 @@
 // route definations for the user
-import { User } from "../models/user.model.js";
 import { Router } from "express";
 import {loginConfirmation , registerUser} from "../controllers/user.controller.js";
 const router = Router();

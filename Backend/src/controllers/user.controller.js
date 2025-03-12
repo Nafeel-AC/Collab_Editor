@@ -1,6 +1,5 @@
 // controller for handling request from user
 import {User} from "../models/user.model.js";
-// import { response } from "express";
 
 async function loginConfirmation(req, res) {
     try {
@@ -33,15 +32,7 @@ async function loginConfirmation(req, res) {
 
 async function registerUser (req , res) {
     console.log("register user" , req.body);
-    // if (req.body.email === undefined || req.body.email === undefined || req.body.password === undefined ) {
-    //     return res.status(400).json({error: "Please provide all the fields"});
-    // }
-    // if (req.body.userName == "" || req.body.email == "" || req.body.password == "") {
-    //     return res.status(400).json({error: "Please provide all the fields"});
-    // }
-    // if (req.body.password.length < 8) {
-    //     return res.status(400).json({error: "Password should be at least 8 characters"});
-    // }
+    /** If there is something missing userName, email , password or password of less length it will be handled in try block and sent to the client */
     try {
         const newUser = new User({
             userName: req.body.userName, 
