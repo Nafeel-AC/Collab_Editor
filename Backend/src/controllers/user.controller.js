@@ -18,7 +18,7 @@ async function loginConfirmation(req, res) {
 
         // Check if the password is correct
         if (requestUser.password === req.body.password) {
-            return res.status(200).send("Login successful");
+            return res.status(200).json({message: "Login successful"});
         } else {
             return res.status(401).json({ message: "Login failed" });
         }
