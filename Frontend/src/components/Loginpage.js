@@ -6,9 +6,26 @@ const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Email:", email, "Password:", password);
+    try {
+      const response = await fetch('http://localhost:3050/api/users/login-confirmation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      console.log('Login Response:', data);
+      if (response.ok) {
+        console.log('Login successful!');
+      } else {
+        console.log('Login failed:', data.message);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+    }
   };
 
   return (
@@ -27,8 +44,6 @@ const LoginPage = () => {
             <h1 className="text-2xl xl:text-3xl font-extrabold text-gray-400">Sign In</h1>
             <div className="w-full flex-1 mt-8">
               <form className="mx-auto max-w-xs" onSubmit={handleSubmit}>
-              
-
                 <input
                   className="w-full px-8 py-4 rounded-lg font-medium bg-gray-700 border border-gray-600 placeholder-gray-400 text-sm focus:outline-none focus:border-gray-500 focus:bg-gray-600"
                   type="email"
@@ -58,7 +73,6 @@ const LoginPage = () => {
               >
                 Don't have an account? Sign Up
               </Link>
-             
             </div>
           </div>
         </div>

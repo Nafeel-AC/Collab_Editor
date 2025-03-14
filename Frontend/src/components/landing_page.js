@@ -98,7 +98,7 @@ export default function LandingPage() {
               <h1 className=" font-railway text-4xl font-bold text-gray-400 sm:text-5xl lg:text-6xl xl:text-7xl">
                 Collaborative Code Editor
               </h1>
-              <p className="mt-4 text-lg font-bold text-gray-400 sm:mt-8">
+              <p className="mt-4 text-lg font-normal text-gray-400 sm:mt-8">
                 Build your projects with your team in real-time. Share your
                 code, collaborate and get instant feedback.
               </p>
@@ -147,7 +147,7 @@ export default function LandingPage() {
               </form>
 
               <div className="mt-8 sm:mt-12">
-                <p className="text-lg font-normal text-white">
+                <p className="text-lg font-normal  text-gray-400">
                   Trusted by 50k+ users
                 </p>
 

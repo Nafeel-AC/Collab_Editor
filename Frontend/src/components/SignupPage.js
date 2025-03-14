@@ -6,9 +6,26 @@ const SignupPage = () => {
   const [password, setPassword] = useState("");
   const [Username, setUsername] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Email:", email, "Password:", password);
+    try {
+      const response = await fetch('http://localhost:3050/api/users/register-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userName: Username, email, password }),
+      });
+      const data = await response.json();
+      console.log('Signup Response:', data);
+      if (response.ok) {
+        console.log('Signup successful!');
+      } else {
+        console.log('Signup failed:', data.message);
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+    }
   };
 
   return (
