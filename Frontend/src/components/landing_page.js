@@ -1,4 +1,5 @@
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import { Link } from "react-router-dom";
 
 export default function LandingPage() {
   return (
@@ -65,14 +66,12 @@ export default function LandingPage() {
                 Pricing{" "}
               </a>
 
-              <a
-                href="#"
-                title=""
+              <Link
+                to="/Support"
                 className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
               >
-                {" "}
-                Support{" "}
-              </a>
+                Support
+              </Link>
             </nav>
 
             <div className="relative hidden md:items-center md:justify-center md:inline-flex group">
@@ -151,6 +150,7 @@ export default function LandingPage() {
                   Trusted by 50k+ users
                 </p>
 
+                <div className="flex items-center mt-3"></div>
                 <div className="flex items-center mt-3">
                   <div className="flex">
                     <svg
