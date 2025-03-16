@@ -1,10 +1,16 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Navigate } from 'react-router-dom';
 import { Bell, Search, Plus, Code2, LogIn, MoreVertical } from 'lucide-react';
 
 function Dashboard() {
   const location = useLocation();
-  const username = location.state?.username || 'User';
+  // Use the userName from the state or redirect if not present
+  const username = location.state?.username;
+
+  // Redirect to login if no username is present
+  if (!username) {
+    return <Navigate to="/LoginPage" replace />;
+  }
 
   const messages = [
     { id: 1, user: 'Sarah Chen', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', message: 'Can you review my code?', time: '2m ago', online: true },
@@ -26,7 +32,7 @@ function Dashboard() {
           <div className="flex items-center gap-3">
             <img
               src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100"
-              alt="Chris Walker"
+              alt={username}
               className="w-10 h-10 rounded-full"
             />
             <div>

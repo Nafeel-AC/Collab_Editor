@@ -7,6 +7,8 @@ module.exports = {
     extend: {
       fontFamily: {
         raleway: ["Raleway", "sans-serif"],
+        'playfair': ['"Playfair Display"', 'serif'],
+
       },
     },
   },

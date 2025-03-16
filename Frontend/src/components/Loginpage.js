@@ -21,7 +21,8 @@ const LoginPage = () => {
       console.log('Login Response:', data);
       if (response.ok) {
         console.log('Login successful!');
-        navigate('/Dashboard', { state: { username: data.username } });
+        // Pass the userName from the response
+        navigate('/Dashboard', { state: { username: data.userName } });
       } else {
         console.log('Login failed:', data.message);
       }
