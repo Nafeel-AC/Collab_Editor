@@ -39,32 +39,26 @@ export default function LandingPage() {
             </div>
 
             <nav className="hidden ml-10 mr-auto space-x-10 lg:ml-20 lg:space-x-12 md:flex md:items-center md:justify-start">
-              <a
-                href="#"
-                title=""
+            <Link
+                to="/Products"
                 className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
               >
-                {" "}
-                Products{" "}
-              </a>
+                Products
+              </Link>
 
-              <a
-                href="#"
-                title=""
+              <Link
+                to="/Features"
                 className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
               >
-                {" "}
-                Features{" "}
-              </a>
+                Features
+              </Link>
 
-              <a
-                href="#"
-                title=""
+              <Link
+                to="/Chatbot"
                 className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
               >
-                {" "}
-                Pricing{" "}
-              </a>
+                ChatBot
+              </Link>
 
               <Link
                 to="/Support"
@@ -76,15 +70,12 @@ export default function LandingPage() {
 
             <div className="relative hidden md:items-center md:justify-center md:inline-flex group">
               <div className="absolute transition-all duration-200 rounded-full -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 group-hover:shadow-lg group-hover:shadow-cyan-500/50"></div>
-              <a
-                href="/LoginPage"
-                title=""
+              <Link
+                to="/LoginPage"
                 className="relative inline-flex items-center justify-center px-6 py-2 text-base font-bold text-gray-400 bg-black border border-transparent rounded-full"
-                role="button"
               >
-                {" "}
-                Login{" "}
-              </a>
+                Login
+              </Link>
             </div>
           </div>
         </div>
