@@ -1,6 +1,8 @@
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Link } from "react-router-dom";
 import GradientText from "./gradient_text";
+import { CarouselDemo } from "./CarouselDemo";
+import { MacbookDemo } from "./MacbookDemo";
 
 export default function LandingPage() {
   return (
@@ -345,6 +347,12 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Macbook Section */}
+      <MacbookDemo />
+
+      {/* Carousel Section */}
+      <CarouselDemo />
     </div>
   );
 }

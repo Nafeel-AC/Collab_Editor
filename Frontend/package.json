@@ -5,6 +5,7 @@
   "dependencies": {
     "@lordicon/react": "^1.10.1",
     "@lottiefiles/dotlottie-react": "^0.13.2",
+    "@tabler/icons-react": "^3.31.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
