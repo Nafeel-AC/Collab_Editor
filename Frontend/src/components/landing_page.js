@@ -1,5 +1,6 @@
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Link } from "react-router-dom";
+import GradientText from "./gradient_text";
 
 export default function LandingPage() {
   return (
@@ -85,9 +86,14 @@ export default function LandingPage() {
         <div className="px-4 mx-auto relative sm:px-6 lg:px-8 max-w-7xl">
           <div className="grid items-center grid-cols-1 gap-y-12 lg:grid-cols-2 gap-x-16">
             <div>
-            <h1 className="font-playfair italic text-4xl font-bold text-gray-400 sm:text-5xl lg:text-6xl xl:text-7xl">
-            Collaborative Code Editor
-              </h1>
+              <GradientText
+                colors={[ "#FF5733", "#C0C0C0", "#808080", "#1E90FF", "#A9A9A9", "#32CD32"]}
+                animationSpeed={4}
+                showBorder={false}
+                className="font-playfair italic text-4xl font-bold sm:text-5xl lg:text-6xl xl:text-7xl"
+              >
+                Collaborative Code Editor
+              </GradientText>
               <p className="mt-4 font-playfair italic text-lg font-normal text-gray-400 sm:mt-8">
                 Build your projects with your team in real-time. Share your
                 code, collaborate and get instant feedback.
