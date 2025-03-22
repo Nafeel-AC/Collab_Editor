@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Search, ChevronDown, Mail, FileText, Users, ArrowLeft } from 'lucide-react';
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import StyledButton from './StyledButton';
+
+
+
 
 function Support() {
   const [faqs, setFaqs] = useState([
@@ -122,12 +126,9 @@ function Support() {
                   className="w-full bg-[#1A1D23] rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <button
-                type="submit"
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-4 py-3 transition-colors"
-              >
+              <StyledButton type="submit">
                 Submit
-              </button>
+              </StyledButton>
               <div className="flex items-center justify-center text-gray-400 mt-4">
                 <Mail size={16} className="mr-2" />
                 <span>nafeelmannan@gmail.com</span>
