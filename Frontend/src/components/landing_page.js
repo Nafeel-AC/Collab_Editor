@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import GradientText from "./gradient_text";
 import { CarouselDemo } from "./CarouselDemo";
 import { MacbookDemo } from "./MacbookDemo";
+import { Footer } from "./Footer";
 
 export default function LandingPage() {
   return (
@@ -42,20 +43,6 @@ export default function LandingPage() {
             </div>
 
             <nav className="hidden ml-10 mr-auto space-x-10 lg:ml-20 lg:space-x-12 md:flex md:items-center md:justify-start">
-            <Link
-                to="/Products"
-                className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
-              >
-                Products
-              </Link>
-
-              <Link
-                to="/Features"
-                className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
-              >
-                Features
-              </Link>
-
               <Link
                 to="/Chatbot"
                 className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
@@ -89,7 +76,14 @@ export default function LandingPage() {
           <div className="grid items-center grid-cols-1 gap-y-12 lg:grid-cols-2 gap-x-16">
             <div>
               <GradientText
-                colors={[ "#FF5733", "#C0C0C0", "#808080", "#1E90FF", "#A9A9A9", "#32CD32"]}
+                colors={[
+                  "#FF5733",
+                  "#C0C0C0",
+                  "#808080",
+                  "#1E90FF",
+                  "#A9A9A9",
+                  "#32CD32",
+                ]}
                 animationSpeed={4}
                 showBorder={false}
                 className="font-playfair italic text-4xl font-bold sm:text-5xl lg:text-6xl xl:text-7xl"
@@ -334,13 +328,13 @@ export default function LandingPage() {
                 src="https://lottie.host/a349f2a2-00d0-4d10-947a-25eb5475015b/V4T6cReIh4.json"
                 loop
                 autoplay
-                style={{ 
-                  width: "600px", 
+                style={{
+                  width: "600px",
                   height: "600px",
                   position: "relative",
                   zIndex: 10,
                   margin: "0 auto",
-                  display: "block"
+                  display: "block",
                 }}
               />
             </div>
@@ -353,6 +347,7 @@ export default function LandingPage() {
 
       {/* Carousel Section */}
       <CarouselDemo />
+      <Footer/>
     </div>
   );
 }
