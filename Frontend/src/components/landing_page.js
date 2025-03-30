@@ -44,7 +44,7 @@ export default function LandingPage() {
 
             <nav className="hidden ml-10 mr-auto space-x-10 lg:ml-20 lg:space-x-12 md:flex md:items-center md:justify-start">
               <Link
-                to="/Chatbot"
+                to="/chatbot"
                 className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
               >
                 ChatBot

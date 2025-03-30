@@ -5,6 +5,7 @@ import LoginPage from './components/Loginpage';
 import SignupPage from './components/SignupPage';
 import Dashboard from './components/Dashboard';
 import Support from './components/Support';
+import ChatbotPage from './components/chatbot';
 import './App.css';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/SignupPage" element={<SignupPage />} />
         <Route path="/Dashboard" element={<Dashboard />} />
         <Route path="/Support" element={<Support />} />
+        <Route path="/chatbot" element={<ChatbotPage />} />
       </Routes>
     </Router>
   );
