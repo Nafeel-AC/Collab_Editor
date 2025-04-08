@@ -11,12 +11,12 @@ app.use(express.urlencoded({ extended: true }));       // parses the incoming re
 app.use(cookieParser());
 
 
-app.get("/" , (req , res) => {
+app.get("/", (req, res) => {
     console.log("request on /");
     res.send("Hello world");
     // res.sendFile("Hello world"); 
 })
- 
+
 // set the routes for the server
 import { router as userRouter } from "./routes/user.route.js";
 app.use("/api/users", userRouter);
