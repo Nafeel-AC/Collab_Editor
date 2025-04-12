@@ -1,1 +1,0 @@
-// Utility function or helper function 
