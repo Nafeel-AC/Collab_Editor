@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
     console.log("request on /");
     res.send("Hello world");
     // res.sendFile("Hello world"); 
-})
+});
 
 // set the routes for the server
 import { router as userRouter } from "./routes/user.route.js";
