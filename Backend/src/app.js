@@ -10,7 +10,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));       // parses the incoming requests (from forms and postman) with urlencoded payloads and place it to req.body
 app.use(cookieParser());
 
-
 app.get("/", (req, res) => {
     console.log("request on /");
     res.send("Hello world");
