@@ -6,6 +6,7 @@ import SignupPage from './components/SignupPage';
 import Dashboard from './components/Dashboard';
 import Support from './components/Support';
 import ChatbotPage from './components/chatbot';
+import ChatPage from "./pages/ChatPage";
 import './App.css';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
         <Route path="/Dashboard" element={<Dashboard />} />
         <Route path="/Support" element={<Support />} />
         <Route path="/chatbot" element={<ChatbotPage />} />
+        <Route path="/chat" element={<ChatPage />} />
       </Routes>
     </Router>
   );

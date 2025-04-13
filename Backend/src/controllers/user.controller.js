@@ -2,6 +2,69 @@
 import {User} from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 
+// Get all users except the current user
+async function getAllUsers(req, res) {
+    try {
+        const users = await User.find()
+            .select('userName email _id friends');
+        res.status(200).json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
+// Add friend
+async function addFriend(req, res) {
+    try {
+        const { friendId } = req.body;
+        const userId = req.user?._id || req.user?.userId; // Handle both formats
+
+        if (!userId || !friendId) {
+            return res.status(400).json({ error: "Missing user ID or friend ID" });
+        }
+
+        // Check if users exist
+        const [user, friend] = await Promise.all([
+            User.findById(userId),
+            User.findById(friendId)
+        ]);
+
+        if (!user || !friend) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        // Check if already friends
+        if (user.friends && user.friends.includes(friendId)) {
+            return res.status(400).json({ error: "Already friends" });
+        }
+
+        // Initialize friends array if it doesn't exist
+        if (!user.friends) user.friends = [];
+        if (!friend.friends) friend.friends = [];
+
+        // Add each other as friends
+        user.friends.push(friendId);
+        friend.friends.push(userId);
+
+        await Promise.all([user.save(), friend.save()]);
+
+        res.status(200).json({ message: "Friend added successfully" });
+    } catch (error) {
+        console.error('Error in addFriend:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+// Get friends list
+async function getFriends(req, res) {
+    try {
+        const userId = req.user.userId;
+        const user = await User.findById(userId).populate('friends', 'userName email _id');
+        res.status(200).json(user.friends);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+}
 
 async function loginConfirmation(req, res) {
     try {
@@ -20,7 +83,6 @@ async function loginConfirmation(req, res) {
  
         // Check if the password is correct
         if (requestUser.password === req.body.password) {
-
             // Create access token
             const accessToken = requestUser.createAccessToken();
             const refreshToken = requestUser.createRefreshToken();
@@ -32,22 +94,26 @@ async function loginConfirmation(req, res) {
                 sameSite: "none",
             });
             res.cookie("refreshtoken", refreshToken, {
-                httpOnly: true,         // This cookie cannot be accessed by client side scripts
-                secure: true,           // This cookie can only be sent over HTTPS
-                sameSite: "none",       // This cookie can be sent to cross-site requests
+                httpOnly: true,
+                secure: true,
+                sameSite: "none",
             });
 
-            return res.status(200).json({message: "Login successful" , userName: requestUser.userName });
+            return res.status(200).json({
+                message: "Login successful",
+                userName: requestUser.userName,
+                userId: requestUser._id,
+                token: accessToken
+            });
         } else {
             return res.status(401).json({ error: "Login failed: Password Incorrect" });
         }
 
     } catch (error) {
-        // Catch any unexpected errors and send an error response
+        console.error('Login error:', error);
         return res.status(500).json({ error: error.message });
     }
 }
-
 
 async function registerUser (req , res) {
     console.log("register user" , req.body);
@@ -56,7 +122,8 @@ async function registerUser (req , res) {
         const newUser = new User({
             userName: req.body.userName, 
             email: req.body.email, 
-            password: req.body.password
+            password: req.body.password,
+            friends: []
         })
         await newUser.save();
         return res.status(200).json({message: "User registered successfully"})
@@ -70,7 +137,6 @@ const logoutUser = async (req , res ) => {
     res.clearCookie("accesstoken");
     res.clearCookie("refreshtoken");
     return res.status(200).json({message: "User logged out successfully"});
-
 }
 
 const refreshToken = async (req , res ) => {
@@ -96,4 +162,30 @@ const refreshToken = async (req , res ) => {
         return res.status(401).json({ error: "Invalid refresh token" });
     }
 }
-export {loginConfirmation  , registerUser , logoutUser , refreshToken};
+
+async function getUserProfile(req, res) {
+    try {
+        const userId = req.user.userId;
+        const user = await User.findById(userId)
+            .select('userName email _id friends');
+        
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
+export {
+    loginConfirmation,
+    registerUser,
+    logoutUser,
+    refreshToken,
+    getAllUsers,
+    addFriend,
+    getFriends,
+    getUserProfile
+};
