@@ -31,7 +31,7 @@ app.use(express.static('public'));
 app.get("/", (req, res) => {
     res.sendFile('index.html', { root: 'public' });
 });
- 
+
 // set the routes for the server
 app.use("/api/users", userRouter);
 

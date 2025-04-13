@@ -1,7 +1,10 @@
 {
   "dependencies": {
+<<<<<<< HEAD
     "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
+=======
+>>>>>>> cf3df923d6755a5c50dc8f20e56afd771f27f8e5
     "socket.io": "^4.8.1"
   }
 }
