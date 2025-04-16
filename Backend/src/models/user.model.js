@@ -1,195 +1,115 @@
 // data base model for user
 import mongoose from "mongoose"
 import jwt from "jsonwebtoken";
+import { Friendship } from "./friendship.model.js";
 
-const userSchema = new mongoose.Schema ({
+const userSchema = new mongoose.Schema({
     userName: {
-        type: String, 
-        required: true, 
+        type: String,
+        required: true,
         trim: true,
         unique: true
-    }, 
+    },
     email: {
-        type: String , 
+        type: String,
         required: true,
         unique: true,
     },
     password: {
-        type: String , 
-        required: true , 
+        type: String,
+        required: true,
         trim: true,
         min: 8,
     },
-    friends: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-        },
-    ],
-    friendRequests: [{
-        from: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
-        },
-        status: {
-            type: String,
-            enum: ['pending', 'accepted', 'rejected'],
-            default: 'pending'
-        },
-        timestamp: {
-            type: Date,
-            default: Date.now
-        }
-    }]
+    status: {
+        type: String,
+        enum: ["online", "offline"],
+        default: "offline",
+    },
+    lastSeen: {
+        type: Date,
+        default: Date.now,
+    },
 }, {
     timestamps: true
 });
 
 /** helper methods of user for creating access and refresh token  */
-userSchema.methods.createAccessToken = function() {
+userSchema.methods.createAccessToken = function () {
     return jwt.sign(
         {
-        userId: this._id,
-        userName: this.userName,
-        email: this.email,
-    }, 
-    process.env.JWT_ACCESS_SECRET, 
-    {
-        expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN,
-    }
-)};
-
-userSchema.methods.createRefreshToken = function() {
-    return jwt.sign(
+            userId: this._id,
+            userName: this.userName,
+            email: this.email,
+        },
+        process.env.JWT_ACCESS_SECRET,
         {
-        userId: this._id
-    }, 
-    process.env.JWT_REFRESH_SECRET, 
-    {
-        expiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRES_IN,
-    }
-)};
-
-// Method to check if users are friends
-userSchema.methods.isFriendWith = async function(userId) {
-    // Ensure the user document is populated with friends
-    if (!this.populated('friends')) {
-        await this.populate('friends');
-    }
-    
-    // Convert both IDs to strings for comparison
-    const targetUserId = userId.toString();
-    
-    // Check if the user is in the friends array
-    return this.friends.some(friend => friend._id.toString() === targetUserId);
+            expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN,
+        }
+    )
 };
 
-// Static method to verify friendship between two users
-userSchema.statics.verifyFriendship = async function(user1Id, user2Id) {
-    try {
-        console.log('Verifying friendship between:', { user1Id, user2Id });
-
-        const [user1, user2] = await Promise.all([
-            this.findById(user1Id).populate('friends'),
-            this.findById(user2Id).populate('friends')
-        ]);
-
-        if (!user1 || !user2) {
-            console.log('One or both users not found:', { user1: !!user1, user2: !!user2 });
-            return false;
+userSchema.methods.createRefreshToken = function () {
+    return jwt.sign(
+        {
+            userId: this._id
+        },
+        process.env.JWT_REFRESH_SECRET,
+        {
+            expiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRES_IN,
         }
+    )
+};
 
-        const user1IdStr = user1._id.toString();
-        const user2IdStr = user2._id.toString();
+// Method to get the friends list of a user 
+userSchema.methods.getFriendsList = async function (userId) {
+    try {
+        const friendsList = await Friendship.getFriendsList(userId);
+        // return the information of the friends of the user 
+        const friendsInfo = await friendsList.map(async (friends) => {
+            // we are getting the ids of the friends from the friendship model
+            const friend = await this.findById(friends);
+            return {
+                id: friend._id,
+                userName: friend.userName,
+                email: friend.email,
+                status: friend.status,
+                lastSeen: friend.lastSeen,
+            };
+        })
+        // return Promise.all(friendsInfo); // promise all is used to wait for all the promises to be resolved
+        return friendsInfo; // return the friends info
+    }
+    catch (error) {
+        console.log("There was an error in getting friends list", error);
+    }
+}
 
-        const user1HasUser2 = user1.friends.some(friend => friend._id.toString() === user2IdStr);
-        const user2HasUser1 = user2.friends.some(friend => friend._id.toString() === user1IdStr);
-
-        console.log('Friendship verification results:', {
-            user1Id: user1IdStr,
-            user2Id: user2IdStr,
-            user1Friends: user1.friends.map(f => f._id.toString()),
-            user2Friends: user2.friends.map(f => f._id.toString()),
-            user1HasUser2,
-            user2HasUser1
+// Method to check if users are friends
+userSchema.methods.isFriendWith = async function (userId) {
+    try {
+        const friendship = await Friendship.findOne({
+            $or: [
+                { user1: this._id, user2: userId },
+                { user1: userId, user2: this._id },
+            ],
         });
-
-        return user1HasUser2 && user2HasUser1;
+        return friendship && friendship.status === "accepted";
     } catch (error) {
-        console.error('Error in verifyFriendship:', error);
+        console.error("Error checking friendship:", error);
         return false;
     }
 };
 
+// Static method to verify friendship between two users
+
 // Method to handle friend requests
-userSchema.methods.handleFriendRequest = async function(fromUserId, accept) {
+userSchema.methods.handleFriendRequest = async function (fromUserId, accept) {
     try {
-        console.log('Handling friend request:', {
-            currentUser: this._id,
-            fromUserId,
-            accept
-        });
 
-        // Find the pending request
-        const request = this.friendRequests.find(
-            req => req.from.toString() === fromUserId.toString() && req.status === 'pending'
-        );
-
-        if (!request) {
-            console.log('Friend request not found');
-            throw new Error('Friend request not found');
-        }
-
-        // Update request status
-        request.status = accept ? 'accepted' : 'rejected';
-
-        if (accept) {
-            // Add each other as friends if not already friends
-            const fromUserIdStr = fromUserId.toString();
-            const thisUserIdStr = this._id.toString();
-
-            console.log('Current friends:', this.friends.map(id => id.toString()));
-
-            // Check if they're already in each other's friends list
-            const alreadyFriends = this.friends.some(id => id.toString() === fromUserIdStr);
-            
-            console.log('Already friends check:', { alreadyFriends });
-
-            if (!alreadyFriends) {
-                // Add to current user's friends
-                this.friends.push(fromUserId);
-                
-                // Add to other user's friends
-                const otherUser = await this.model('User').findById(fromUserId);
-                if (otherUser) {
-                    const otherAlreadyFriends = otherUser.friends.some(id => id.toString() === thisUserIdStr);
-                    
-                    console.log('Other user friend check:', {
-                        otherUserId: otherUser._id,
-                        otherUserFriends: otherUser.friends.map(id => id.toString()),
-                        otherAlreadyFriends
-                    });
-
-                    if (!otherAlreadyFriends) {
-                        otherUser.friends.push(this._id);
-                        await otherUser.save();
-                    }
-                }
-            }
-        }
-
-        await this.save();
-        
-        console.log('Friend request handled successfully:', {
-            currentUserFriends: this.friends.map(id => id.toString()),
-            status: request.status
-        });
-
-        return accept;
     } catch (error) {
-        console.error('Error in handleFriendRequest:', error);
-        throw error;
+
     }
 };
 
-export const User = mongoose.model("User" , userSchema);
+export const User = mongoose.model("User", userSchema);

@@ -2,10 +2,10 @@ import dotenv from 'dotenv';
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { createServer } from 'http';
+// import { createServer } from 'http';
 import { router as userRouter } from "./routes/user.route.js";
 import { errorHandler } from './middlewares/error.middleware.js';
-import { initializeSocket } from './socket/socket.handler.js';
+// import { initializeSocket } from './socket/socket.handler.js';
 import { apiLimiter } from './middlewares/rateLimiter.middleware.js';
 
 // Load environment variables
@@ -39,10 +39,11 @@ app.use("/api/users", userRouter);
 app.use(errorHandler);
 
 // Create HTTP server
-const server = createServer(app);
+// const server = createServer(app);
 
 // Initialize Socket.IO
-const io = initializeSocket(server);
-app.set('io', io);
+// const io = initializeSocket(server);
+// app.set('io', io);
 
-export { app, server };
+// export { app, server };
+export { app };

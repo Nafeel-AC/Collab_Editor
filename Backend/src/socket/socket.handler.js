@@ -1,23 +1,25 @@
 import { Server } from 'socket.io';
 import { verifyToken } from '../middlewares/auth.middleware.js';
 import { Message } from '../models/message.model.js';
+import { User } from '../models/user.model.js';
+import { APIError } from '../middlewares/error.middleware.js';
 
 export const initializeSocket = (server) => {
     const io = new Server(server, {
         cors: {
             origin: process.env.FRONTEND_URL || 'http://localhost:3000',
             methods: ['GET', 'POST'],
-            credentials: true
+            credentials: true,
         },
         pingTimeout: 60000, // 1 minute
-        pingInterval: 25000, // 25 seconds
+        pingInterval: 5000, // 25 seconds
     });
 
     // Middleware to authenticate socket connections
     io.use(async (socket, next) => {
         try {
-            const token = socket.handshake.auth.token || socket.handshake.query.token;
-            
+            const token = socket.handshake.auth.accesstoken || socket.handshake.query.accesstoken;
+
             if (!token) {
                 return next(new Error('Authentication error: Token not provided'));
             }
@@ -35,21 +37,45 @@ export const initializeSocket = (server) => {
         }
     });
 
+    // Store currently connected users
+    // userId: socketId
     const connectedUsers = new Map();
 
     io.on('connection', (socket) => {
+
+        /** Operations that are done on first connection of user */
+        /** ---------------------------------------------------- */
+        console.log("All users", connectedUsers)
         const userId = socket.user._id;
         console.log(`User connected: ${userId}`);
-        
+
         // Store user connection
         connectedUsers.set(userId.toString(), socket.id);
         socket.join(userId.toString());
 
         // Send initial online status
+        // Need to send send to all of the online user friends that he is online 
         io.emit('user_status', {
             userId: userId.toString(),
             status: 'online'
         });
+
+        // get the friends list of connected user and send it to him
+        const friends = User.getFriendList(userId.toString())
+        if (!friends) {
+            throw new APIError('Unable to fetch friends list', 500);
+        }
+        socket.emit("friends_list", {
+            friends: friends.map(friend => ({
+                _id: friend._id,
+                userName: friend.userName,
+                email: friend.email,
+                status: connectedUsers.has(friend._id.toString()) ? 'online' : 'offline'
+            }))
+        })
+
+        /** From here on operations are done on specific event */
+
 
         // Handle disconnection
         socket.on('disconnect', () => {
@@ -116,4 +142,4 @@ export const initializeSocket = (server) => {
 
     // Attach io instance to app for use in routes
     return io;
-}; 
+};

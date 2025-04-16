@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+        }
+        .logout-btn {
+            padding: 8px 16px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background: #c82333;
+        }
+        .content {
+            display: flex;
+            gap: 20px;
+        }
+        .users-section, .chat-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Welcome, <span id="userName"></span></h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+    <div class="content">
+        <div class="users-section">
+            <h2>Users</h2>
+            <div id="usersList"></div>
+        </div>
+        <div class="chat-section">
+            <h2>Chat</h2>
+            <div id="messages"></div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="Type your message...">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        let socket = null;
+
+        // Initialize Socket.IO connection
+        function initializeSocket() {
+            socket = io({
+                autoConnect: false,
+            });
+
+            socket.on("message_update", (message) => {
+                console.log("Received message update:", message);
+            });
+
+            socket.on("connect", () => {
+                console.log("Socket connected");
+            });
+
+            socket.on("disconnect", () => {
+                console.log("Socket disconnected");
+            });
+        }
+
+        // Authenticate and connect the socket
+        function authenticateSocket(token) {
+            if (!socket) {
+                initializeSocket();
+            }
+            socket.connect();
+            socket.emit("authenticate", token);
+        }
+
+        // Logout function
+        function logout() {
+            if (socket) {
+                socket.disconnect();
+            }
+            localStorage.removeItem("token");
+            localStorage.removeItem("currentUser");
+            window.location.href = "/";
+        }
+
+        // Load user data and initialize the page
+        function loadDashboard() {
+            const token = localStorage.getItem("token");
+            const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+
+            if (!token || !currentUser) {
+                logout();
+                return;
+            }
+
+            document.getElementById("userName").textContent = currentUser.userName;
+            authenticateSocket(token);
+        }
+
+        document.addEventListener("DOMContentLoaded", loadDashboard);
+    </script>
+</body>
+</html>

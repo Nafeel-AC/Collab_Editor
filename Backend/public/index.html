@@ -252,89 +252,52 @@
     </div>
 
     <script>
-        let selectedUser = null;
-        let currentUser = null;
-        let socket = null;
+        let socket = null; // Socket.IO instance
+        let currentUser = null; // Current logged-in user
+        let selectedUser = null; // Currently selected user for chat
+        let userRefreshInterval = null; // Interval for refreshing user list
 
-        // Initialize Socket.IO connection
+        // Initialize Socket.IO connection with autoConnect set to false
         function initializeSocket() {
-            socket = io();
-
-            // Authenticate socket connection
-            const token = localStorage.getItem('token');
-            if (token) {
-                socket.emit('authenticate', token);
-            }
+            socket = io({
+                autoConnect: false, // Prevent auto-connect
+            });
 
             // Handle real-time message updates
-            socket.on('message_update', (message) => {
-                console.log('Received message update:', message);
-                
-                // Only update UI if chatting with the sender/recipient
-                if (selectedUser && 
-                    (message.sender === selectedUser._id || message.recipient === selectedUser._id)) {
-                    
-                    // Add the new message to the messages array
-                    const messagesDiv = document.getElementById('messages');
-                    const messages = getCurrentMessages();
-                    messages.push(message);
-                    displayMessages(messages);
-                }
+            socket.on("message_update", (message) => {
+                console.log("Received message update:", message);
+                // Handle message updates
             });
 
-            // Handle message read receipts
-            socket.on('message_read', (data) => {
-                console.log('Message read receipt:', data);
-                if (selectedUser && selectedUser._id === data.readBy) {
-                    const messageElement = document.querySelector(`[data-message-id="${data.messageId}"]`);
-                    if (messageElement) {
-                        const readStatus = messageElement.querySelector('.read-status');
-                        if (readStatus) {
-                            readStatus.style.display = 'inline';
-                        }
-                    }
-                }
-            });
-
-            // Handle message errors
-            socket.on('message_error', (error) => {
-                console.error('Message error:', error);
-                alert('Failed to send message: ' + error.error);
+            // Handle authentication errors
+            socket.on("authentication_error", (error) => {
+                console.error("Socket authentication error:", error);
+                alert("Authentication failed. Please log in again.");
             });
 
             // Handle connection status
-            socket.on('connect', () => {
-                console.log('Socket connected');
-                document.getElementById('connectionStatus').style.display = 'none';
+            socket.on("connect", () => {
+                console.log("Socket connected");
+                document.getElementById("connectionStatus").style.display = "none";
             });
 
-            socket.on('disconnect', () => {
-                console.log('Socket disconnected');
-                document.getElementById('connectionStatus').style.display = 'block';
+            socket.on("disconnect", () => {
+                console.log("Socket disconnected");
+                document.getElementById("connectionStatus").style.display = "block";
             });
         }
 
-        // Helper function to get current messages from the UI
-        function getCurrentMessages() {
-            const messagesDiv = document.getElementById('messages');
-            const messageElements = messagesDiv.querySelectorAll('.message');
-            const messages = [];
-            
-            messageElements.forEach(element => {
-                const content = element.querySelector('.message-content').textContent;
-                const timestamp = element.querySelector('.message-time').dataset.timestamp;
-                const isSent = element.classList.contains('sent');
-                
-                messages.push({
-                    content,
-                    timestamp: new Date(timestamp),
-                    sender: isSent ? currentUser._id : selectedUser._id,
-                    recipient: isSent ? selectedUser._id : currentUser._id,
-                    read: element.querySelector('.read-status')?.style.display !== 'none'
-                });
-            });
-            
-            return messages;
+        // Function to authenticate and connect the socket
+        function authenticateSocket(token) {
+            if (!socket) {
+                initializeSocket();
+            }
+
+            // Connect the socket
+            socket.connect();
+
+            // Emit the authenticate event with the token
+            socket.emit("authenticate", token);
         }
 
         // Function to handle login success
@@ -343,553 +306,115 @@
             currentUser = {
                 _id: data.userId,
                 userName: data.userName,
-                friends: data.friends || []
+                friends: data.friends || [],
             };
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            
-            // Initialize Socket.IO connection
-            initializeSocket();
-            
-            // Hide login, show main content
-            document.getElementById('loginSection').style.display = 'none';
-            document.getElementById('mainContent').style.display = 'flex';
-            
-            // Start fetching users
-            fetchUsers();
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("currentUser", JSON.stringify(currentUser));
+
+            // Redirect to the dashboard page
+            window.location.href = "/dashboard.html";
+        }
+
+        // Function to start refreshing the user list
+        function startUserRefresh() {
+            if (userRefreshInterval) {
+                clearInterval(userRefreshInterval);
+            }
+
+            userRefreshInterval = setInterval(() => {
+                if (currentUser && document.visibilityState === "visible") {
+                    fetchUsers();
+                }
+            }, 10000); // Refresh every 10 seconds
+        }
+
+        // Function to logout
+        function logout() {
+            // Disconnect the socket if it exists
+            if (socket) {
+                socket.disconnect();
+                console.log("Socket disconnected on logout");
+            }
+
+            // Clear any intervals (e.g., user refresh)
+            if (userRefreshInterval) {
+                clearInterval(userRefreshInterval);
+            }
+
+            // Clear local storage
+            localStorage.removeItem("token");
+            localStorage.removeItem("currentUser");
+
+            // Reset state
+            currentUser = null;
+            selectedUser = null;
+
+            // Update UI
+            document.getElementById("loginSection").style.display = "block";
+            document.getElementById("mainContent").style.display = "none";
+            document.getElementById("loginForm").reset();
+            document.getElementById("messages").innerHTML = "";
+            document.getElementById("usersList").innerHTML = "";
+
+            // Notify the server about logout (optional)
+            fetch("/api/users/logout", {
+                method: "POST",
+                headers: getAuthHeaders(),
+            }).catch((error) => console.error("Logout error:", error));
         }
 
         // Function to check and restore session
         async function checkSession() {
-            const token = localStorage.getItem('token');
-            const savedUser = localStorage.getItem('currentUser');
-            
+            const token = localStorage.getItem("token");
+            const savedUser = localStorage.getItem("currentUser");
+
             if (token && savedUser) {
                 try {
-                    const response = await fetch('/api/users/me', {
+                    const response = await fetch("/api/users/me", {
                         headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        }
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                        },
                     });
-                    
+
                     if (response.ok) {
                         const userData = await response.json();
                         currentUser = {
                             ...JSON.parse(savedUser),
-                            friends: userData.friends || []
+                            friends: userData.friends || [],
                         };
                         handleLoginSuccess({
                             userId: currentUser._id,
                             userName: currentUser.userName,
                             token: token,
-                            friends: userData.friends
+                            friends: userData.friends,
                         });
                     } else {
                         // If session is invalid, clear storage and show login
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('currentUser');
-                        document.getElementById('loginSection').style.display = 'block';
-                        document.getElementById('mainContent').style.display = 'none';
+                        localStorage.removeItem("token");
+                        localStorage.removeItem("currentUser");
+                        document.getElementById("loginSection").style.display = "block";
+                        document.getElementById("mainContent").style.display = "none";
                     }
                 } catch (error) {
-                    console.error('Session check error:', error);
-                    document.getElementById('loginSection').style.display = 'block';
-                    document.getElementById('mainContent').style.display = 'none';
+                    console.error("Session check error:", error);
+                    document.getElementById("loginSection").style.display = "block";
+                    document.getElementById("mainContent").style.display = "none";
                 }
             }
         }
-
-        // Function to check connection status
-        async function checkConnection() {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                document.getElementById('connectionStatus').style.display = 'block';
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/users/me', {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    document.getElementById('connectionStatus').style.display = 'none';
-                    // Update current user's friends list
-                    if (currentUser) {
-                        currentUser.friends = data.friends || [];
-                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    }
-                } else {
-                    console.error('Connection check failed:', data);
-                    document.getElementById('connectionStatus').style.display = 'block';
-                    if (data.error === "User not found") {
-                        // Session is invalid, trigger logout
-                        logout();
-                    }
-                }
-            } catch (error) {
-                console.error('Connection error:', error);
-                document.getElementById('connectionStatus').style.display = 'block';
-            }
-        }
-
-        // Update the login form submission handler
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-
-            try {
-                const response = await fetch('/api/users/login-confirmation', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    handleLoginSuccess(data);
-                } else {
-                    document.getElementById('loginError').textContent = data.error || 'Login failed';
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                document.getElementById('loginError').textContent = 'Error connecting to server';
-            }
-        });
-
-        // Function to logout
-        function logout() {
-            if (socket) {
-                socket.disconnect();
-            }
-            if (window.messageRefreshInterval) {
-                clearInterval(window.messageRefreshInterval);
-            }
-            if (userRefreshInterval) {
-                clearInterval(userRefreshInterval);
-            }
-            
-            // Clear local storage
-            localStorage.removeItem('token');
-            localStorage.removeItem('currentUser');
-            
-            // Reset state
-            currentUser = null;
-            selectedUser = null;
-            
-            // Update UI
-            document.getElementById('loginSection').style.display = 'block';
-            document.getElementById('mainContent').style.display = 'none';
-            document.getElementById('loginForm').reset();
-            document.getElementById('messages').innerHTML = '';
-            document.getElementById('usersList').innerHTML = '';
-            
-            // Notify server about logout
-            fetch('/api/users/logout', { 
-                method: 'POST',
-                headers: getAuthHeaders()
-            }).catch(error => console.error('Logout error:', error));
-        }
-
-        // Call checkSession when the page loads
-        document.addEventListener('DOMContentLoaded', checkSession);
 
         // Function to get auth headers
         function getAuthHeaders() {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem("token");
             return {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
             };
         }
 
-        // Function to fetch and display users
-        let lastUserFetch = 0;
-        const USER_FETCH_INTERVAL = 10000; // 10 seconds
-
-        async function fetchUsers() {
-            const now = Date.now();
-            if (now - lastUserFetch < USER_FETCH_INTERVAL) {
-                return; // Don't fetch if we've fetched recently
-            }
-            
-            try {
-                const response = await fetch('/api/users', {
-                    headers: getAuthHeaders()
-                });
-                if (!response.ok) {
-                    throw new Error('Failed to fetch users');
-                }
-                const users = await response.json();
-                displayUsers(users.filter(user => user._id !== currentUser._id));
-                lastUserFetch = now;
-            } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('usersList').innerHTML = '<p>Error loading users</p>';
-            }
-        }
-
-        // Function to display users
-        function displayUsers(users) {
-            const usersList = document.getElementById('usersList');
-            if (!Array.isArray(users) || users.length === 0) {
-                usersList.innerHTML = '<p>No other users registered</p>';
-                return;
-            }
-
-            const usersHTML = users.map(user => {
-                // Convert friend IDs to strings for comparison
-                const userFriends = user.friends?.map(id => id.toString()) || [];
-                const currentUserIdStr = currentUser._id.toString();
-                const isFriend = userFriends.includes(currentUserIdStr);
-                
-                return `
-                    <div class="user-item ${isFriend ? 'is-friend' : ''}" onclick="${isFriend ? `selectUser('${user._id}', '${user.userName}')` : 'void(0)'}">
-                        <div class="user-info">
-                            <div class="user-name">${user.userName}</div>
-                            <div class="user-email">${user.email}</div>
-                        </div>
-                        <button class="add-friend-btn" onclick="handleFriendAction('${user._id}', event)">
-                            ${isFriend ? 'Friends' : 'Add Friend'}
-                        </button>
-                    </div>
-                `;
-            }).join('');
-
-            usersList.innerHTML = `<div class="user-list">${usersHTML}</div>`;
-        }
-
-        // Function to select a user for chat
-        function selectUser(userId, userName) {
-            // Clear previous interval if exists
-            if (window.messageRefreshInterval) {
-                clearInterval(window.messageRefreshInterval);
-            }
-
-            // If clicking the same user, do nothing
-            if (selectedUser && selectedUser._id === userId) {
-                return;
-            }
-
-            selectedUser = { _id: userId, userName: userName };
-            document.getElementById('chatSection').style.display = 'block';
-            document.getElementById('chatHeader').textContent = `Chat with ${userName}`;
-            document.getElementById('messages').innerHTML = '<p class="no-messages">Loading messages...</p>';
-            
-            // Clear message input
-            document.getElementById('messageInput').value = '';
-            
-            console.log('Selected user for chat:', userId, userName);
-            
-            // Initial fetch of messages
-            fetchMessages(userId);
-        }
-
-        // Function to fetch messages
-        async function fetchMessages(userId) {
-            if (!userId || !currentUser) {
-                console.error('Invalid user ID or not logged in');
-                return;
-            }
-            
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) {
-                    throw new Error('No authentication token found');
-                }
-
-                // First check if they are friends
-                const userResponse = await fetch('/api/users/me', {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                const userData = await userResponse.json();
-                const userFriends = userData.friends?.map(id => id.toString()) || [];
-                const userIdStr = userId.toString();
-                
-                console.log('Friend check:', {
-                    userFriends,
-                    userId: userIdStr,
-                    isFriend: userFriends.includes(userIdStr)
-                });
-                
-                if (!userResponse.ok || !userFriends.includes(userIdStr)) {
-                    throw new Error('You can only view messages with friends');
-                }
-
-                console.log('Fetching messages for conversation between:', currentUser._id, 'and', userId);
-                const messagesResponse = await fetch(`/api/users/messages/${userId}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                const messagesData = await messagesResponse.json();
-                console.log('Received messages:', messagesData);
-
-                if (!messagesResponse.ok) {
-                    throw new Error(messagesData.error || 'Failed to fetch messages');
-                }
-
-                // Only update UI if still chatting with the same user
-                if (selectedUser && selectedUser._id === userId) {
-                    displayMessages(messagesData);
-                }
-            } catch (error) {
-                console.error('Error fetching messages:', error);
-                if (selectedUser && selectedUser._id === userId) {
-                    document.getElementById('messages').innerHTML = 
-                        `<p class="error">Error loading messages: ${error.message}</p>`;
-                }
-            }
-        }
-
-        // Helper function to escape HTML to prevent XSS
-        function escapeHtml(unsafe) {
-            return unsafe
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        // Helper functions for date handling
-        function isSameDay(date1, date2) {
-            return date1.getDate() === date2.getDate() &&
-                   date1.getMonth() === date2.getMonth() &&
-                   date1.getFullYear() === date2.getFullYear();
-        }
-
-        function yesterday() {
-            const date = new Date();
-            date.setDate(date.getDate() - 1);
-            return date;
-        }
-
-        // Function to send message
-        async function sendMessage() {
-            if (!selectedUser || !currentUser || !socket) {
-                alert('Please select a user to chat with');
-                return;
-            }
-
-            const messageInput = document.getElementById('messageInput');
-            const content = messageInput.value.trim();
-            if (!content) {
-                return;
-            }
-
-            try {
-                // Clear input immediately for better UX
-                messageInput.value = '';
-                
-                // Emit message through socket
-                socket.emit('new_message', {
-                    recipientId: selectedUser._id,
-                    content: content
-                });
-                
-            } catch (error) {
-                console.error('Error sending message:', error);
-                alert('Failed to send message. Please try again.');
-                messageInput.value = content; // Restore the message if it failed
-            }
-        }
-
-        // Function to handle friend actions (add/remove friend)
-        async function handleFriendAction(userId, event) {
-            event.stopPropagation(); // Prevent triggering the parent click event
-            
-            try {
-                const response = await fetch('/api/users/add-friend', {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify({ friendId: userId })
-                });
-
-                const data = await response.json();
-                
-                if (response.ok) {
-                    // Refresh the users list to show updated friend status
-                    await fetchUsers();
-                    // If we're currently chatting with this user, refresh messages
-                    if (selectedUser && selectedUser._id === userId) {
-                        await fetchMessages(userId);
-                    }
-                    // Refresh current user data
-                    const userResponse = await fetch('/api/users/me', {
-                        headers: getAuthHeaders()
-                    });
-                    const userData = await userResponse.json();
-                    currentUser = {
-                        ...currentUser,
-                        friends: userData.friends
-                    };
-                } else {
-                    alert(data.error || 'Failed to update friend status');
-                }
-            } catch (error) {
-                console.error('Error updating friend status:', error);
-                alert('Failed to update friend status');
-            }
-        }
-
-        // Add event listener for Enter key in message input
-        document.getElementById('messageInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // Update the interval for user list refresh
-        const userRefreshInterval = setInterval(() => {
-            if (currentUser && document.visibilityState === 'visible') {
-                fetchUsers();
-            }
-        }, 10000); // Reduced to 10 seconds
-
-        // Add visibility change handler to pause/resume updates when tab is hidden/visible
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                if (selectedUser) {
-                    fetchMessages(selectedUser._id);
-                }
-                if (currentUser) {
-                    fetchUsers();
-                }
-            }
-        });
-
-        // Add this function to check connection status
-        async function checkConnection() {
-            try {
-                const response = await fetch('/api/users/me', {
-                    headers: getAuthHeaders()
-                });
-                
-                if (!response.ok) {
-                    console.error('Connection check failed:', await response.text());
-                    document.getElementById('connectionStatus').style.display = 'block';
-                } else {
-                    document.getElementById('connectionStatus').style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Connection error:', error);
-                document.getElementById('connectionStatus').style.display = 'block';
-            }
-        }
-
-        // Add connection status element to HTML
-        const connectionStatusDiv = document.createElement('div');
-        connectionStatusDiv.id = 'connectionStatus';
-        connectionStatusDiv.style.cssText = `
-            display: none;
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #ff4444;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
-        `;
-        connectionStatusDiv.textContent = 'Connection issues detected';
-        document.body.appendChild(connectionStatusDiv);
-
-        // Check connection periodically
-        setInterval(checkConnection, 10000);
-
-        // Add the displayMessages function
-        function displayMessages(messages) {
-            const messagesDiv = document.getElementById('messages');
-            if (!Array.isArray(messages)) {
-                console.error('Invalid messages data:', messages);
-                messagesDiv.innerHTML = '<p class="error">Invalid message data received</p>';
-                return;
-            }
-
-            if (messages.length === 0) {
-                messagesDiv.innerHTML = '<p class="no-messages">No messages yet. Start the conversation!</p>';
-                return;
-            }
-
-            try {
-                const currentScrolledToBottom = 
-                    messagesDiv.scrollHeight - messagesDiv.clientHeight <= messagesDiv.scrollTop + 1;
-
-                let lastDate = null;
-                const messagesHTML = messages.map(msg => {
-                    if (!msg || !msg.timestamp) {
-                        console.error('Invalid message object:', msg);
-                        return '';
-                    }
-
-                    const messageDate = new Date(msg.timestamp);
-                    const today = new Date();
-                    let dateDisplay = '';
-
-                    // Show date separator if it's a different day
-                    if (!lastDate || !isSameDay(lastDate, messageDate)) {
-                        if (isSameDay(messageDate, today)) {
-                            dateDisplay = '<div class="date-separator">Today</div>';
-                        } else if (isSameDay(messageDate, yesterday())) {
-                            dateDisplay = '<div class="date-separator">Yesterday</div>';
-                        } else {
-                            dateDisplay = `<div class="date-separator">${messageDate.toLocaleDateString()}</div>`;
-                        }
-                        lastDate = messageDate;
-                    }
-
-                    const isSent = msg.sender === currentUser._id;
-                    
-                    return `
-                        ${dateDisplay}
-                        <div class="message ${isSent ? 'sent' : 'received'}" data-message-id="${msg._id || ''}">
-                            <div class="message-content">${escapeHtml(msg.content || '')}</div>
-                            <div class="message-time" data-timestamp="${messageDate.toISOString()}">
-                                ${messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                ${isSent ? `<span class="read-status" style="display: ${msg.read ? 'inline' : 'none'}">✓</span>` : ''}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                messagesDiv.innerHTML = messagesHTML;
-                
-                // Only scroll to bottom if user was already at bottom or it's a new message from current user
-                if (currentScrolledToBottom || messages[messages.length - 1]?.sender === currentUser._id) {
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                }
-
-                // Mark received messages as read
-                const unreadMessageIds = messages
-                    .filter(msg => msg.sender !== currentUser._id && !msg.read && msg._id)
-                    .map(msg => msg._id);
-
-                if (unreadMessageIds.length > 0 && socket) {
-                    socket.emit('mark_read', { messageIds: unreadMessageIds });
-                }
-            } catch (error) {
-                console.error('Error displaying messages:', error);
-                messagesDiv.innerHTML = '<p class="error">Error displaying messages</p>';
-            }
-        }
+        // Call checkSession when the page loads
+        document.addEventListener("DOMContentLoaded", checkSession);
     </script>
 </body>
 </html>
