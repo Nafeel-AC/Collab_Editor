@@ -18,6 +18,14 @@ const SignupPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [glowIntensity, setGlowIntensity] = useState(0.3);
 
+  // Check if already logged in
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      navigate("/home", { replace: true });
+    }
+  }, [navigate]);
+
   useEffect(() => {
     const intervalId = setInterval(() => {
       setGlowIntensity(prev => {
@@ -53,10 +61,16 @@ const SignupPage = () => {
         password: formData.password
       });
 
-      if (response.data.success) {
-        navigate('/LoginPage');
+      if (response.data.token) {
+        // Store token in localStorage for client-side access
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("userName", response.data.userName);
+        localStorage.setItem("userId", response.data.userId);
+        
+        // Redirect to home page after successful registration
+        navigate("/home", { replace: true });
       } else {
-        setError(response.data.message || 'Registration failed');
+        setError("Invalid registration response");
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');

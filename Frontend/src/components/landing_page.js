@@ -1,11 +1,40 @@
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import GradientText from "./gradient_text";
 import { CarouselDemo } from "./CarouselDemo";
 import { MacbookDemo } from "./MacbookDemo";
 import { Footer } from "./Footer";
+import { LogOut, User, ChevronDown } from "lucide-react";
 
 export default function LandingPage() {
+  const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // Check if user is logged in
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const storedUserName = localStorage.getItem("userName");
+    
+    if (token) {
+      setIsAuthenticated(true);
+      setUserName(storedUserName || "User");
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userId");
+    setIsAuthenticated(false);
+    setShowDropdown(false);
+    
+    // Force reload to ensure all components update
+    window.location.reload();
+  };
+
   return (
     <div className="">
       <header className="py-4 bg-black sm:py-6">
@@ -50,12 +79,23 @@ export default function LandingPage() {
                 ChatBot
               </Link>
 
-              <Link
-                to="/tasks"
-                className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
-              >
-                Tasks
-              </Link>
+              {isAuthenticated && (
+                <Link
+                  to="/tasks"
+                  className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
+                >
+                  Tasks
+                </Link>
+              )}
+
+              {isAuthenticated && (
+                <Link
+                  to="/Dashboard"
+                  className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
+                >
+                  Dashboard
+                </Link>
+              )}
 
               <Link
                 to="/Support"
@@ -65,15 +105,53 @@ export default function LandingPage() {
               </Link>
             </nav>
 
-            <div className="relative hidden md:items-center md:justify-center md:inline-flex group">
-              <div className="absolute transition-all duration-200 rounded-full -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 group-hover:shadow-lg group-hover:shadow-cyan-500/50"></div>
-              <Link
-                to="/LoginPage"
-                className="relative inline-flex items-center justify-center px-6 py-2 text-base font-bold text-gray-400 bg-black border border-transparent rounded-full"
-              >
-                Login
-              </Link>
-            </div>
+            {!isAuthenticated ? (
+              <div className="relative hidden md:items-center md:justify-center md:inline-flex group">
+                <div className="absolute transition-all duration-200 rounded-full -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 group-hover:shadow-lg group-hover:shadow-cyan-500/50"></div>
+                <Link
+                  to="/LoginPage"
+                  className="relative inline-flex items-center justify-center px-6 py-2 text-base font-bold text-gray-400 bg-black border border-transparent rounded-full"
+                >
+                  Login
+                </Link>
+              </div>
+            ) : (
+              <div className="relative hidden md:flex items-center">
+                <button 
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="flex items-center space-x-2 text-gray-400 hover:text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-all duration-200"
+                >
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center">
+                    <User size={16} className="text-white" />
+                  </div>
+                  <span className="font-medium">{userName}</span>
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showDropdown && (
+                  <div className="absolute top-full mt-1 right-0 bg-gray-900 border border-gray-700 rounded-md shadow-lg w-48 py-1 z-50">
+                    <Link
+                      to="/Dashboard"
+                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      to="/tasks"
+                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
+                    >
+                      My Tasks
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white flex items-center"
+                    >
+                      <LogOut size={14} className="mr-2" /> Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>

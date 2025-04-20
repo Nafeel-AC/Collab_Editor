@@ -161,63 +161,88 @@ const TaskBoard = () => {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        setLoading(true)
+        setLoading(true);
         // Get token from localStorage
-        const token = localStorage.getItem("token")
+        const token = localStorage.getItem("token");
+        const userName = localStorage.getItem("userName");
 
-        console.log("Authentication token:", token ? "Token exists" : "No token found")
+        console.log("Authentication token:", token ? "Token exists" : "No token found");
 
         if (!token) {
-          console.log("No authentication token found, using sample tasks instead")
-          createSampleTasks()
-          return
+          console.log("No authentication token found, using sample tasks instead");
+          createSampleTasks();
+          return;
         }
 
-        console.log("Attempting to fetch tasks from:", `${API_URL}/tasks`)
+        console.log(`Fetching tasks for user: ${userName || 'Unknown'}`);
+        console.log("Attempting to fetch tasks from:", `${API_URL}/tasks`);
 
         const response = await axios.get(`${API_URL}/tasks`, {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        })
+        });
 
-        console.log("Tasks fetch response:", response.data)
+        console.log(`Received ${response.data.length} tasks from server`);
 
         // Group tasks by status
         const groupedTasks = {
           todo: [],
           inProgress: [],
           done: [],
+        };
+
+        if (response.data.length === 0) {
+          console.log("No tasks found for this user");
         }
 
         response.data.forEach((task) => {
-          if (groupedTasks[task.status]) {
-            groupedTasks[task.status].push({
-              id: task._id,
-              title: task.title,
-              description: task.description,
-              priority: task.priority,
-              dueDate: new Date(task.dueDate).toISOString().split("T")[0],
-            })
-          }
-        })
+          // Make sure the task has a valid status that matches our columns
+          const status = task.status && groupedTasks[task.status] ? task.status : "todo";
+          
+          // Push task to appropriate column
+          groupedTasks[status].push({
+            id: task._id,
+            title: task.title,
+            description: task.description,
+            priority: task.priority || "medium",
+            dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+          });
+        });
 
-        setTasks(groupedTasks)
-        setError(null)
+        setTasks(groupedTasks);
+        setError(null);
       } catch (err) {
-        console.error("Error fetching tasks:", err)
+        console.error("Error fetching tasks:", err);
+        
+        if (err.response) {
+          console.log("Server error response:", err.response.status, err.response.data);
+          
+          if (err.response.status === 401) {
+            setError("Authentication error. Please log in again.");
+            // Optionally redirect to login page
+            // window.location.href = '/LoginPage';
+          } else {
+            setError(`Server error: ${err.response.data.message || 'Unknown error'}`);
+          }
+        } else if (err.request) {
+          console.log("No response from server");
+          setError("Cannot connect to server. Please check your connection.");
+        } else {
+          setError("An error occurred while fetching tasks.");
+        }
+        
         // If API fails, use sample tasks for demonstration
-        console.log("Using sample tasks for demonstration")
-        createSampleTasks()
-        setError("Failed to load tasks from server. Using sample tasks instead.")
+        console.log("Using sample tasks for demonstration");
+        createSampleTasks();
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchTasks()
-  }, [])
+    fetchTasks();
+  }, []);
 
   // Handle adding a new task
   const handleAddTask = async () => {

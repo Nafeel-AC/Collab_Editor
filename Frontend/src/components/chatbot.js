@@ -98,7 +98,7 @@ export default function ChatbotPage() {
 
   const updateChatHistory = (newMessages) => {
     setChatHistory(newMessages)
-    
+
     // Update the conversations array with new messages
     setConversations((prevConversations) =>
       prevConversations.map((conv) => {
@@ -117,7 +117,7 @@ export default function ChatbotPage() {
       title: "New Chat",
       messages: [],
     }
-    
+
     setConversations((prevConversations) => [...prevConversations, newChat])
     setActiveConversation(newChatId)
     setChatHistory([])
@@ -161,7 +161,7 @@ export default function ChatbotPage() {
     setConversations((prevConversations) => 
       prevConversations.filter((conv) => conv.id !== id)
     )
-    
+
     if (activeConversation === id) {
       createNewChat()
     }
@@ -212,7 +212,7 @@ export default function ChatbotPage() {
 
       // Make API call to Gemini API
       const response = await fetch("http://localhost:3050/api/chat", {
-        method: "POST",
+          method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -220,7 +220,7 @@ export default function ChatbotPage() {
       })
 
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.message || "Error communicating with API")
       }
@@ -321,7 +321,7 @@ export default function ChatbotPage() {
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
-                  onClick={toggleTheme}
+            onClick={toggleTheme}
                   className="p-2 rounded-full hover:bg-[#2d2d2d] transition-colors"
                 >
                   {isDarkMode ? <Sun size={18} className="text-[#a0a0a0]" /> : <Moon size={18} />}
@@ -329,7 +329,7 @@ export default function ChatbotPage() {
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
-                  onClick={toggleMenu}
+                onClick={toggleMenu}
                   className="md:hidden p-2 rounded-full hover:bg-[#2d2d2d] transition-colors"
                 >
                   <X size={18} className="text-[#a0a0a0]" />
@@ -342,7 +342,7 @@ export default function ChatbotPage() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={createNewChat}
+            onClick={createNewChat}
                 className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg bg-[#2d2d2d] hover:bg-[#3d3d3d] text-white font-medium border border-[#3d3d3d] shadow-lg hover:shadow-[#4f46e5]/10 transition-all duration-300"
               >
                 <Plus size={18} className="text-[#4f46e5]" />
@@ -354,11 +354,11 @@ export default function ChatbotPage() {
             <div className="flex-1 overflow-y-auto">
               <div className="p-2">
                 <h2 className="px-2 text-sm font-medium uppercase text-[#777777] mb-2">Recent Conversations</h2>
-                {conversations.map((conv) => (
+            {conversations.map((conv) => (
                   <motion.div
-                    key={conv.id}
+                key={conv.id}
                     whileHover={{ scale: 1.02, x: 4 }}
-                    onClick={() => switchConversation(conv.id)}
+                onClick={() => switchConversation(conv.id)}
                     className={`flex items-center justify-between p-3 mb-1 rounded-lg cursor-pointer group ${
                       activeConversation === conv.id
                         ? "bg-[#2d2d2d] text-white border border-[#3d3d3d]"
@@ -368,13 +368,13 @@ export default function ChatbotPage() {
                     <div className="flex items-center space-x-3 truncate">
                       <div className="flex-shrink-0 p-2 rounded-md bg-[#242424] border border-[#3d3d3d]">
                         <MessageSquare size={14} className="text-[#4f46e5]" />
-                      </div>
+                  </div>
                       <span className="truncate text-sm">{conv.title}</span>
                     </div>
                     <motion.button
                       whileHover={{ scale: 1.2 }}
                       whileTap={{ scale: 0.8 }}
-                      onClick={(e) => deleteConversation(conv.id, e)}
+                  onClick={(e) => deleteConversation(conv.id, e)}
                       className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-[#363636] text-[#777777] hover:text-white transition-opacity"
                     >
                       <Trash size={14} />
@@ -504,8 +504,8 @@ export default function ChatbotPage() {
                     <div className="w-2 h-2 rounded-full bg-[#4f46e5] animate-bounce" style={{ animationDelay: "0ms" }}></div>
                     <div className="w-2 h-2 rounded-full bg-[#4f46e5] animate-bounce" style={{ animationDelay: "150ms" }}></div>
                     <div className="w-2 h-2 rounded-full bg-[#4f46e5] animate-bounce" style={{ animationDelay: "300ms" }}></div>
-                  </div>
-                </div>
+              </div>
+            </div>
               </motion.div>
             )}
           </div>
@@ -515,7 +515,7 @@ export default function ChatbotPage() {
         <div className="p-4 border-t border-[#2d2d2d] bg-[#0d0d0d]">
           <div className="max-w-3xl mx-auto relative">
             {/* Rename chat interface */}
-            {isNamingChat ? (
+                    {isNamingChat ? (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -523,22 +523,22 @@ export default function ChatbotPage() {
               >
                 <label className="block text-sm font-medium mb-2 text-[#a0a0a0]">Name this conversation</label>
                 <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={newChatName}
-                    onChange={(e) => setNewChatName(e.target.value)}
+                          <input
+                            type="text"
+                            value={newChatName}
+                            onChange={(e) => setNewChatName(e.target.value)}
                     onKeyPress={handleNameKeyPress}
                     placeholder="Enter a name for this chat"
                     className="flex-1 rounded-lg p-2 bg-[#0d0d0d] border border-[#3d3d3d] text-[#e0e0e0] focus:border-[#4f46e5] focus:outline-none focus:ring-1 focus:ring-[#4f46e5]"
-                    autoFocus
-                  />
+                            autoFocus
+                          />
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={saveChatName}
+                            onClick={saveChatName}
                     className="px-4 py-2 rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white shadow-md shadow-[#4f46e5]/20"
-                  >
-                    Save
+                          >
+                            Save
                   </motion.button>
                 </div>
               </motion.div>
@@ -546,10 +546,10 @@ export default function ChatbotPage() {
 
             {/* Message input */}
             <div className="flex items-end space-x-2 rounded-xl p-2 bg-[#1a1a1a] border border-[#2d2d2d] shadow-lg">
-              <textarea
-                ref={textareaRef}
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
+                <textarea
+                  ref={textareaRef}
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
                 className="flex-1 resize-none overflow-y-auto max-h-28 p-3 rounded-lg bg-[#0d0d0d] text-[#f0f0f0] placeholder-[#666666] border border-[#2d2d2d] focus:border-[#4f46e5] focus:ring-0 focus:outline-none transition-colors"
@@ -557,7 +557,7 @@ export default function ChatbotPage() {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={handleSendMessage}
+                  onClick={handleSendMessage}
                 disabled={!userInput.trim() || isLoading}
                 className={`p-3 rounded-full transition-all ${
                   !userInput.trim() || isLoading

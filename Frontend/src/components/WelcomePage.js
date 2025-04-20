@@ -75,7 +75,7 @@ const WelcomePage = () => {
   }, []);
 
   const handleWelcomeClick = () => {
-    // Just navigate - no cleanup needed with iframe approach
+    // Navigate directly to landing page
     navigate('/home');
   };
 

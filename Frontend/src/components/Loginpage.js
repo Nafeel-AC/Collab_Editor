@@ -17,7 +17,7 @@ const LoginPage = () => {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      navigate("/Dashboard", { replace: true });
+      navigate("/home", { replace: true });
     }
   }, [navigate]);
 
@@ -56,8 +56,8 @@ const LoginPage = () => {
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("userName", response.data.userName);
         
-        // Force navigation with replace for cleaner history
-        navigate("/Dashboard", { replace: true });
+        // Redirect to landing page instead of Dashboard
+        navigate("/home", { replace: true });
       } else {
         setError("Invalid login response");
       }

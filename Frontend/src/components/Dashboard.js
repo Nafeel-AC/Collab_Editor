@@ -815,9 +815,9 @@ function Dashboard() {
   // If authentication check is still in progress, show a loading state
   if (loading && !userName) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#1a1a1a] text-gray-200">
+      <div className="flex h-screen items-center justify-center bg-[#1c1c1f] text-[#e6e6e6]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-300 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#3b82f6] mx-auto"></div>
           <p className="mt-4 text-lg">Loading dashboard...</p>
         </div>
       </div>
@@ -832,30 +832,30 @@ function Dashboard() {
   // Friends are now managed by state
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-black to-gray-900 text-white">
+    <div className="flex h-screen overflow-hidden bg-[#0f0f10] text-[#e6e6e6]">
       {/* Left sidebar with user info and tabs */}
       <motion.div 
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className="w-72 flex flex-col border-r border-gray-700 bg-black backdrop-blur-sm bg-opacity-80 shadow-xl"
+        className="w-72 flex flex-col border-r border-[#2f2f35] bg-[#1c1c1f] shadow-xl"
       >
         {/* User info and navigation header */}
-        <div className="p-4 bg-gradient-to-r from-gray-900 to-black rounded-b-xl shadow-md border-b border-gray-700">
+        <div className="p-4 bg-[#1c1c1f] rounded-b-xl shadow-md border-b border-[#2f2f35]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-gray-500 to-gray-700 flex items-center justify-center text-xl font-bold mr-3 border border-gray-600">
+              <div className="h-10 w-10 rounded-full bg-[#2a2a2e] flex items-center justify-center text-xl font-bold mr-3 border border-[#2f2f35]">
                 {userName?.charAt(0)?.toUpperCase() || 'U'}
               </div>
             <div>
-                <h3 className="font-bold tracking-wide text-gray-200">{userName || 'User'}</h3>
+                <h3 className="font-bold tracking-wide text-[#e6e6e6]">{userName || 'User'}</h3>
                 <div className="text-xs flex items-center">
                   <span className={`h-2 w-2 rounded-full mr-2 ${
-                    socketStatus === 'connected' ? 'bg-green-500' : 
-                    socketStatus === 'connecting' ? 'bg-yellow-500' : 
-                    'bg-red-500'
+                    socketStatus === 'connected' ? 'bg-[#10b981]' : 
+                    socketStatus === 'connecting' ? 'bg-[#3b82f6]' : 
+                    'bg-[#ef4444]'
                   }`}></span>
-                  <span className="text-gray-400">
+                  <span className="text-[#a0a0a0]">
                     {socketStatus === 'connected' ? 'Online' : 
                      socketStatus === 'connecting' ? 'Connecting...' : 
                      'Offline'}
@@ -865,7 +865,7 @@ function Dashboard() {
             </div>
             <button 
               onClick={handleLogout} 
-              className="text-gray-400 hover:text-red-300 transition-colors p-2 rounded-full hover:bg-gray-800"
+              className="text-[#a0a0a0] hover:text-[#ef4444] transition-colors p-2 rounded-full hover:bg-[#2a2a2e]"
               title="Logout"
             >
               <LogOut size={18} />
@@ -878,37 +878,37 @@ function Dashboard() {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={handleCreateRoom}
-              className="flex-1 flex items-center justify-center bg-gradient-to-r from-gray-700 to-gray-900 p-2 rounded-lg text-sm shadow-lg hover:shadow-gray-700/30 transition-all border border-gray-600"
+              className="flex-1 flex items-center justify-center bg-[#2a2a2e] p-2 rounded-lg text-sm shadow-lg hover:bg-[#1f1f22] transition-all border border-[#2f2f35]"
             >
-              <Plus size={14} className="mr-1" /> Create Room
+              <Plus size={14} className="mr-1 text-[#3b82f6]" /> Create Room
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => navigate('/join-room', { state: { username: userName } })}
-              className="flex-1 flex items-center justify-center bg-gray-800 p-2 rounded-lg text-sm shadow-lg hover:shadow-gray-700/30 transition-all border border-gray-700"
+              className="flex-1 flex items-center justify-center bg-[#2a2a2e] p-2 rounded-lg text-sm shadow-lg hover:bg-[#1f1f22] transition-all border border-[#2f2f35]"
             >
-              <LogIn size={14} className="mr-1" /> Join Room
+              <LogIn size={14} className="mr-1 text-[#3b82f6]" /> Join Room
             </motion.button>
           </div>
 
           {/* Add a simple room input field below the buttons */}
           {activeTab === 'friends' && !selectedFriend && (
-            <div className="mt-3 p-2 bg-gray-900 rounded-lg border border-gray-800">
+            <div className="mt-3 p-2 bg-[#1c1c1f] rounded-lg border border-[#2f2f35]">
               <div className="flex items-center space-x-2">
                 <input 
                   type="text" 
                   placeholder="Enter room ID to join..."
                   value={roomId}
                   onChange={(e) => setRoomId(e.target.value)}
-                  className="flex-1 p-2 text-sm bg-black border border-gray-700 rounded-lg focus:border-gray-500 focus:ring-1 focus:ring-gray-500 outline-none text-gray-200"
+                  className="flex-1 p-2 text-sm bg-[#2a2a2e] border border-[#2f2f35] rounded-lg focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] outline-none text-[#e6e6e6]"
                 />
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleJoinRoom}
                   disabled={!roomId.trim()}
-                  className="p-2 rounded-lg bg-gray-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 rounded-lg bg-[#3b82f6] text-[#e6e6e6] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <LogIn size={16} />
                 </motion.button>
@@ -918,36 +918,36 @@ function Dashboard() {
         </div>
 
         {/* Tabs for navigating between friends, users, and requests */}
-        <div className="flex border-b border-gray-800 bg-gray-900 bg-opacity-30">
+        <div className="flex border-b border-[#2f2f35] bg-[#1c1c1f]">
           <motion.button
-            whileHover={{ backgroundColor: "rgba(17, 24, 39, 0.8)" }}
+            whileHover={{ backgroundColor: "#2a2a2e" }}
             className={`flex-1 py-3 flex justify-center items-center text-sm font-medium transition-colors ${
-              activeTab === 'friends' ? 'text-white border-b-2 border-gray-400' : 'text-gray-400'
+              activeTab === 'friends' ? 'text-[#e6e6e6] border-b-2 border-[#3b82f6]' : 'text-[#a0a0a0]'
             }`}
                 onClick={() => setActiveTab('friends')} 
           >
             <Users size={16} className="mr-2" /> Friends
           </motion.button>
           <motion.button
-            whileHover={{ backgroundColor: "rgba(17, 24, 39, 0.8)" }}
+            whileHover={{ backgroundColor: "#2a2a2e" }}
             className={`flex-1 py-3 flex justify-center items-center text-sm font-medium transition-colors ${
-              activeTab === 'users' ? 'text-white border-b-2 border-gray-400' : 'text-gray-400'
+              activeTab === 'users' ? 'text-[#e6e6e6] border-b-2 border-[#3b82f6]' : 'text-[#a0a0a0]'
             }`}
                 onClick={() => setActiveTab('users')} 
           >
             <UserPlus size={16} className="mr-2" /> Users
           </motion.button>
           <motion.button
-            whileHover={{ backgroundColor: "rgba(17, 24, 39, 0.8)" }}
+            whileHover={{ backgroundColor: "#2a2a2e" }}
             className={`flex-1 py-3 flex justify-center items-center text-sm font-medium transition-colors ${
-              activeTab === 'requests' ? 'text-white border-b-2 border-gray-400' : 'text-gray-400'
+              activeTab === 'requests' ? 'text-[#e6e6e6] border-b-2 border-[#3b82f6]' : 'text-[#a0a0a0]'
             }`}
                 onClick={() => setActiveTab('requests')} 
               >
             <Bell size={16} className="mr-2" /> 
             Requests
                 {friendRequests.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+              <span className="ml-1 px-1.5 py-0.5 bg-[#ef4444] text-[#e6e6e6] text-xs rounded-full">
                     {friendRequests.length}
                   </span>
                 )}
@@ -955,7 +955,7 @@ function Dashboard() {
           </div>
           
         {/* Search input */}
-        <div className="p-3 border-b border-gray-800">
+        <div className="p-3 border-b border-[#2f2f35]">
                         <div className="relative">
                   <input
                     type="text"
@@ -1016,9 +1016,9 @@ function Dashboard() {
                   }
                 }
               }}
-              className="w-full p-2 pl-8 rounded-lg bg-black border border-gray-700 focus:border-gray-500 focus:ring-1 focus:ring-gray-500 transition-all outline-none text-sm text-gray-300"
+              className="w-full p-2 pl-8 rounded-lg bg-[#2a2a2e] border border-[#2f2f35] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-all outline-none text-sm text-[#e6e6e6]"
             />
-            <Search size={16} className="absolute left-2.5 top-2.5 text-gray-500" />
+            <Search size={16} className="absolute left-2.5 top-2.5 text-[#a0a0a0]" />
             
             {searchTerm.length > 0 && (
               <motion.button
@@ -1056,23 +1056,22 @@ function Dashboard() {
                     fetchFriends();
                   }
                 }}
-                className="absolute right-2.5 top-2.5 text-gray-500 hover:text-white"
+                className="absolute right-2.5 top-2.5 p-1 rounded-full text-[#a0a0a0] hover:text-[#e6e6e6] hover:bg-[#2a2a2e]"
               >
-                <X size={14} />
+                <X size={16} />
               </motion.button>
             )}
+            
+            {loading && (
+              <div className="absolute right-2.5 top-2.5 p-1">
+                <div className="animate-spin h-4 w-4 border-2 border-[#3b82f6] border-t-transparent rounded-full"></div>
+              </div>
+            )}
+          </div>
                 </div>
                 
-          {/* Show loading indicator when searching */}
-          {loading && (
-            <div className="text-center text-xs text-gray-400 mt-1">
-              Searching...
-            </div>
-          )}
-        </div>
-
-        {/* User lists based on active tab */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+        {/* Content area for user lists */}
+        <div className="flex-1 overflow-y-auto bg-[#1c1c1f]">
           <AnimatePresence mode="wait">
             {activeTab === 'friends' && (
               <motion.div
@@ -1081,29 +1080,28 @@ function Dashboard() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
+                className="divide-y divide-[#2f2f35]"
               >
                 {friends.length === 0 ? (
-                  <div className="p-4 text-center text-gray-400 text-sm">
+                  <div className="p-4 text-center text-[#a0a0a0] text-sm">
                     <Users size={20} className="mx-auto mb-2" />
-                    No friends yet. Add friends from the Users tab.
+                    No friends yet. Add some users as friends!
                   </div>
                 ) : (
-                  <div>
+                  <div className="divide-y divide-[#2f2f35]">
                     {friends.map((friend) => (
                       <motion.div
                         key={friend.id}
-                        whileHover={{ backgroundColor: "rgba(17, 24, 39, 0.8)" }}
+                        whileHover={{ backgroundColor: "#2a2a2e" }}
                         onClick={() => handleSelectFriend(friend)}
-                        className={`flex items-center p-3 cursor-pointer transition-colors ${
-                          selectedFriend?.id === friend.id ? 'bg-gray-800 bg-opacity-70' : ''
-                        }`}
+                        className="flex items-center p-3 cursor-pointer transition-colors"
                       >
-                        <div className="h-9 w-9 rounded-full bg-gradient-to-r from-gray-500 to-gray-700 flex items-center justify-center text-sm font-bold mr-3 border border-gray-600">
+                        <div className="h-9 w-9 rounded-full bg-[#2a2a2e] flex items-center justify-center text-sm font-bold mr-3 border border-[#2f2f35]">
                           {friend.name?.charAt(0)?.toUpperCase() || 'U'}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium truncate text-gray-200">{friend.name}</h4>
-                          <p className="text-xs text-gray-500 truncate">Click to chat</p>
+                          <h4 className="font-medium truncate text-[#e6e6e6]">{friend.name}</h4>
+                          <p className="text-xs text-[#a0a0a0] truncate">Click to chat</p>
                         </div>
                       </motion.div>
                     ))}
@@ -1121,32 +1119,32 @@ function Dashboard() {
                 transition={{ duration: 0.2 }}
               >
                 {filteredUsers.length === 0 ? (
-                  <div className="p-4 text-center text-gray-400 text-sm">
+                  <div className="p-4 text-center text-[#a0a0a0] text-sm">
                     <Search size={20} className="mx-auto mb-2" />
                     No users found.
                   </div>
                 ) : (
-                          <div>
+                  <div className="divide-y divide-[#2f2f35]">
                     {filteredUsers.map((user) => (
                       <motion.div
                         key={user.id}
-                        whileHover={{ backgroundColor: "rgba(17, 24, 39, 0.8)" }}
+                        whileHover={{ backgroundColor: "#2a2a2e" }}
                         className="flex items-center justify-between p-3 transition-colors"
                       >
                         <div className="flex items-center">
-                          <div className="h-9 w-9 rounded-full bg-gradient-to-r from-gray-600 to-gray-800 flex items-center justify-center text-sm font-bold mr-3 border border-gray-700">
+                          <div className="h-9 w-9 rounded-full bg-[#2a2a2e] flex items-center justify-center text-sm font-bold mr-3 border border-[#2f2f35]">
                             {user.name?.charAt(0)?.toUpperCase() || 'U'}
                           </div>
-                          <div>
-                            <h4 className="font-medium text-gray-200">{user.name}</h4>
-                            <p className="text-xs text-gray-500">{user.email}</p>
-                        </div>
+                  <div>
+                            <h4 className="font-medium text-[#e6e6e6]">{user.name}</h4>
+                            <p className="text-xs text-[#a0a0a0]">{user.email}</p>
+                          </div>
                         </div>
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
                           onClick={() => handleSendFriendRequest(user.id)}
-                          className="p-2 rounded-full text-white bg-gray-700 hover:bg-gray-600 transition-colors border border-gray-600"
+                          className="p-2 rounded-full text-[#e6e6e6] bg-[#3b82f6] hover:bg-[#2a2a2e] transition-colors border border-[#2f2f35]"
                         >
                           <UserPlus size={16} />
                         </motion.button>
@@ -1166,31 +1164,31 @@ function Dashboard() {
                 transition={{ duration: 0.2 }}
               >
                 {friendRequests.length === 0 ? (
-                  <div className="p-4 text-center text-gray-400 text-sm">
+                  <div className="p-4 text-center text-[#a0a0a0] text-sm">
                     <Bell size={20} className="mx-auto mb-2" />
                     No friend requests.
                   </div>
                 ) : (
-                        <div>
+                  <div className="divide-y divide-[#2f2f35]">
                     {friendRequests.map((request) => (
                       <motion.div
                         key={request.id}
-                        whileHover={{ backgroundColor: "rgba(17, 24, 39, 0.8)" }}
+                        whileHover={{ backgroundColor: "#2a2a2e" }}
                         className="flex items-center p-3 transition-colors"
                       >
-                        <div className="h-9 w-9 rounded-full bg-gradient-to-r from-gray-600 to-gray-800 flex items-center justify-center text-sm font-bold mr-3 border border-gray-700">
+                        <div className="h-9 w-9 rounded-full bg-[#2a2a2e] flex items-center justify-center text-sm font-bold mr-3 border border-[#2f2f35]">
                           {request.name?.charAt(0)?.toUpperCase() || 'U'}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium truncate text-gray-200">{request.name}</h4>
-                          <p className="text-xs text-gray-500 truncate">Sent you a friend request</p>
+                          <h4 className="font-medium truncate text-[#e6e6e6]">{request.name}</h4>
+                          <p className="text-xs text-[#a0a0a0] truncate">Sent you a friend request</p>
                       </div>
                         <div className="flex space-x-1">
                           <motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                           onClick={() => handleAcceptFriendRequest(request.id)}
-                            className="p-1.5 rounded-full text-white bg-green-700 hover:bg-green-600 transition-colors border border-green-800"
+                            className="p-1.5 rounded-full text-[#e6e6e6] bg-[#22c55e] hover:bg-[#10b981] transition-colors border border-[#2f2f35]"
                             title="Accept"
                           >
                             <Check size={14} />
@@ -1199,7 +1197,7 @@ function Dashboard() {
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                           onClick={() => handleRejectFriendRequest(request.id)}
-                            className="p-1.5 rounded-full text-white bg-red-700 hover:bg-red-600 transition-colors border border-red-800"
+                            className="p-1.5 rounded-full text-[#e6e6e6] bg-[#ef4444] hover:bg-[#dc2626] transition-colors border border-[#2f2f35]"
                             title="Reject"
                         >
                             <X size={14} />
@@ -1220,25 +1218,25 @@ function Dashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3, delay: 0.1 }}
-        className="flex-1 flex flex-col"
+        className="flex-1 flex flex-col bg-[#0f0f10]"
       >
         {selectedFriend ? (
           <>
             {/* Chat header */}
-            <div className="p-4 flex items-center border-b border-gray-800 bg-black bg-opacity-70 backdrop-blur-sm">
+            <div className="p-4 flex items-center border-b border-[#2f2f35] bg-[#1c1c1f] backdrop-blur-sm">
                 <button 
                 onClick={() => setSelectedFriend(null)}
-                className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 mr-2 md:hidden"
+                className="p-2 rounded-full text-[#a0a0a0] hover:text-[#e6e6e6] hover:bg-[#2a2a2e] mr-2 md:hidden"
                 >
                 <ChevronLeft size={18} />
                 </button>
-              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-gray-500 to-gray-700 flex items-center justify-center text-sm font-bold mr-3 border border-gray-600">
+              <div className="h-10 w-10 rounded-full bg-[#2a2a2e] flex items-center justify-center text-sm font-bold mr-3 border border-[#2f2f35]">
                 {selectedFriend.name?.charAt(0)?.toUpperCase() || 'U'}
               </div>
               <div>
-                <h3 className="font-bold text-gray-200">{selectedFriend.name}</h3>
-                <div className="text-xs text-gray-500 flex items-center">
-                  <span className="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
+                <h3 className="font-bold text-[#e6e6e6]">{selectedFriend.name}</h3>
+                <div className="text-xs text-[#a0a0a0] flex items-center">
+                  <span className="h-2 w-2 rounded-full bg-[#10b981] mr-2"></span>
                   Online
           </div>
         </div>
@@ -1246,12 +1244,11 @@ function Dashboard() {
 
             {/* Messages container */}
             <div
-              ref={messagesEndRef}
-              className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
-              style={{ backgroundImage: 'radial-gradient(circle at center, rgba(17, 24, 39, 0.1) 0%, rgba(0, 0, 0, 0.2) 100%)' }}
+              className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-[#2f2f35] scrollbar-track-transparent"
+              style={{ backgroundImage: 'radial-gradient(circle at center, rgba(42, 42, 46, 0.3) 0%, rgba(15, 15, 16, 0.5) 100%)' }}
             >
               {messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-gray-400 text-center p-6">
+                <div className="h-full flex items-center justify-center text-[#a0a0a0] text-center p-6">
                   <div>
                     <MessageSquare size={40} className="mx-auto mb-3 opacity-50" />
                     <p>No messages yet.</p>
@@ -1272,12 +1269,12 @@ function Dashboard() {
                       <div
                         className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-md ${
                           isMine 
-                            ? 'bg-gradient-to-r from-gray-600 to-gray-800 text-white rounded-tr-none border border-gray-700' 
-                            : 'bg-black text-white rounded-tl-none border border-gray-800'
-                        } ${message.pending ? 'opacity-70' : ''} ${message.error ? 'bg-red-900 border-red-800' : ''}`}
+                            ? 'bg-[#3b82f6] text-[#e6e6e6] rounded-tr-none' 
+                            : 'bg-[#2a2a2e] text-[#e6e6e6] rounded-tl-none border border-[#2f2f35]'
+                        } ${message.pending ? 'opacity-70' : ''} ${message.error ? 'bg-[#ef4444] border-[#2f2f35]' : ''}`}
                       >
                         <p className="text-sm">{message.text}</p>
-                        <p className="text-xs text-gray-400 mt-1 text-right">
+                        <p className="text-xs text-[#e6e6e6] mt-1 text-right opacity-70">
                           {message.pending && '⏳ Sending...'}
                           {message.error && '❌ Failed to send'}
                           {!message.pending && !message.error && new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1291,9 +1288,9 @@ function Dashboard() {
             </div>
 
             {/* Message input */}
-            <div className="p-3 border-t border-gray-800 bg-black bg-opacity-70 backdrop-blur-sm">
+            <div className="p-3 border-t border-[#2f2f35] bg-[#1c1c1f]">
               {error && (
-                <div className="text-center text-red-500 text-xs mb-2">
+                <div className="text-center text-[#ef4444] text-xs mb-2">
                   {error}
               </div>
               )}
@@ -1303,49 +1300,49 @@ function Dashboard() {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type your message..."
-                  className="flex-1 p-3 rounded-full bg-gray-900 border border-gray-700 focus:border-gray-500 focus:ring-1 focus:ring-gray-500 transition-all outline-none text-sm"
+                  className="flex-1 p-3 rounded-full bg-[#2a2a2e] border border-[#2f2f35] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-all outline-none text-sm text-[#e6e6e6]"
                 />
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   type="submit"
                   disabled={!newMessage.trim() || socketStatus !== 'connected'}
-                  className="p-3 rounded-full bg-gradient-to-r from-gray-700 to-gray-900 text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-gray-700/30 transition-shadow border border-gray-600"
+                  className="p-3 rounded-full bg-[#3b82f6] text-[#e6e6e6] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-shadow border border-[#2f2f35]"
                 >
                   <Send size={18} />
                 </motion.button>
               </form>
-              <div className="text-xs text-center mt-2 text-gray-500">
+              <div className="text-xs text-center mt-2 text-[#a0a0a0]">
                 {socketStatus === 'connected' ? (
-                  <span className="text-green-400">✓ Connected</span>
+                  <span className="text-[#22c55e]">✓ Connected</span>
                 ) : (
-                  <span className="text-yellow-400">⚠ Connection issues. Messages may not send.</span>
+                  <span className="text-[#ef4444]">⚠ Connection issues. Messages may not send.</span>
                 )}
               </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="flex-1 flex items-center justify-center bg-[#0f0f10]">
             <div className="text-center p-6 max-w-md">
-              <div className="bg-gradient-to-br from-gray-500 via-gray-600 to-gray-800 w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center border border-gray-700">
-                <MessageSquare size={30} className="text-gray-300" />
+              <div className="bg-[#2a2a2e] w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center border border-[#2f2f35]">
+                <MessageSquare size={30} className="text-[#e6e6e6]" />
           </div>
-              <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-300 to-white mb-2">Welcome to Chat</h2>
-              <p className="text-gray-400 mb-6">Select a friend from the sidebar to start chatting or use the rooms feature for collaborative coding.</p>
+              <h2 className="text-2xl font-bold text-[#e6e6e6] mb-2">Welcome to Chat</h2>
+              <p className="text-[#a0a0a0] mb-6">Select a friend from the sidebar to start chatting or use the rooms feature for collaborative coding.</p>
               <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3 justify-center">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setActiveTab('users')}
-                  className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white shadow-lg transition-all flex items-center justify-center border border-gray-700"
+                  className="px-4 py-2 rounded-lg bg-[#2a2a2e] hover:bg-[#1f1f22] text-[#e6e6e6] shadow-lg transition-all flex items-center justify-center border border-[#2f2f35]"
                 >
-                  <UserPlus size={16} className="mr-2" /> Find Users
+                  <UserPlus size={16} className="mr-2 text-[#3b82f6]" /> Find Users
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleCreateRoom}
-                  className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white shadow-lg transition-all flex items-center justify-center border border-gray-600"
+                  className="px-4 py-2 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] text-[#e6e6e6] shadow-lg transition-all flex items-center justify-center"
                 >
                   <Code2 size={16} className="mr-2" /> Create Coding Room
                 </motion.button>
