@@ -10,7 +10,9 @@ import {
     acceptFriendRequest,
     rejectFriendRequest,
     getFriendRequests,
-    getFriends
+    getFriends,
+    getCurrentUser,
+    checkFriendshipStatus
 } from "../controllers/user.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 const router = Router();
@@ -23,16 +25,19 @@ router.route("/signup").post(registerUser);
 
 router.route("/login-page").get((req , res) => {
     /** when user wants to login it should receive the login page */
-    res.send("Login page");
+    res.render("login");
 })
 
 router.route("/register-page").get((req , res) => {
     /** when user hits this api end point send the user registration page */
-    res.send("Register user page")
+    res.render("register");
 })
 
 router.route("/logout").get(verifyToken , logoutUser);
-router.route("/refresh-token").get(refreshToken);
+router.route("/refresh-token").post(refreshToken);
+
+// Current user route
+router.route("/me").get(verifyToken, getCurrentUser);
 
 // Friend-related routes
 router.route("/all").get(verifyToken, getAllUsers);
@@ -42,4 +47,7 @@ router.route("/send-friend-request").post(verifyToken, sendFriendRequest);
 router.route("/accept-friend-request").post(verifyToken, acceptFriendRequest);
 router.route("/reject-friend-request").post(verifyToken, rejectFriendRequest);
 
-export {router};
+// Debug endpoints
+router.route("/check-friendship").get(verifyToken, checkFriendshipStatus);
+
+export default router;

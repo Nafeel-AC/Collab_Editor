@@ -1,0 +1,35 @@
+@font-face {
+  font-family: 'Winking Rough';
+  src: url('./WinkyRough-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Winking Rough';
+  src: url('./WinkyRough-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Bold variant - using the variable font with a weight setting */
+@font-face {
+  font-family: 'Winking Rough';
+  src: url('./WinkyRough-VariableFont_wght.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+  font-variation-settings: 'wght' 700;
+}
+
+/* Bold italic variant */
+@font-face {
+  font-family: 'Winking Rough';
+  src: url('./WinkyRough-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: bold;
+  font-style: italic;
+  font-display: swap;
+  font-variation-settings: 'wght' 700;
+} 

@@ -6,32 +6,76 @@ const WelcomePage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showButton, setShowButton] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
-  // Set loading state to false once the Spline viewer is loaded
+  // Show welcome button after animation plays for a bit
   useEffect(() => {
-    const script = document.createElement('script');
-    script.type = 'module';
-    script.src = 'https://unpkg.com/@splinetool/viewer@1.9.82/build/spline-viewer.js';
-    script.onload = () => setLoading(false);
-    document.head.appendChild(script);
+    if (iframeLoaded) {
+      const timer = setTimeout(() => {
+        setShowButton(true);
+      }, 7000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [iframeLoaded]);
 
+  // Create a self-contained Spline HTML
+  useEffect(() => {
+    const splineHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Spline Viewer</title>
+        <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.82/build/spline-viewer.js"></script>
+        <style>
+          body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+          }
+          spline-viewer {
+            width: 100%;
+            height: 100%;
+          }
+        </style>
+      </head>
+      <body>
+        <spline-viewer url="https://prod.spline.design/wsnyqBN34003xlRb/scene.splinecode" 
+                      loading-anim="true"
+                      loading-anim-color="#3b82f6"
+                      events-target="global"
+                      play-mode="auto"></spline-viewer>
+      </body>
+      </html>
+    `;
+    
+    // Create blob from HTML string
+    const blob = new Blob([splineHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    
+    // Set the iframe src
+    const iframe = document.getElementById('spline-iframe');
+    if (iframe) {
+      iframe.src = url;
+      
+      // Mark loading as complete once iframe is loaded
+      iframe.onload = () => {
+        setLoading(false);
+        setIframeLoaded(true);
+      };
+    }
+    
     return () => {
-      document.head.removeChild(script);
+      // Release the blob URL when component unmounts
+      URL.revokeObjectURL(url);
     };
   }, []);
 
-  // Show welcome button after robot animation plays for a bit
-  useEffect(() => {
-    if (!loading) {
-      const timer = setTimeout(() => {
-        setShowButton(true);
-      }, 7000); // 8 seconds after robot loads
-
-      return () => clearTimeout(timer);
-    }
-  }, [loading]);
-
   const handleWelcomeClick = () => {
+    // Just navigate - no cleanup needed with iframe approach
     navigate('/home');
   };
 
@@ -40,24 +84,24 @@ const WelcomePage = () => {
       {/* Tech circuit background */}
       <div className="absolute inset-0 z-0 tech-circuit-bg"></div>
       
-      {/* Robot Spline animation fullscreen */}
+      {/* Spline animation in iframe */}
       <div className="absolute inset-0 z-10 flex items-center justify-center">
         {loading ? (
           <div className="flex flex-col items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
             <p className="text-gray-400">Loading animation...</p>
           </div>
-        ) : (
-          <spline-viewer 
-            className="w-full h-full" 
-            url="https://prod.spline.design/wsnyqBN34003xlRb/scene.splinecode"
-            loading-anim="true"
-            loading-anim-color="#3b82f6"
-            events-target="global"
-            play-mode="auto"
-            is-interactive="true"
-          ></spline-viewer>
-        )}
+        ) : null}
+        
+        {/* The iframe is always present but invisible until loaded */}
+        <iframe 
+          id="spline-iframe"
+          className={`w-full h-full border-0 ${loading ? 'opacity-0' : 'opacity-100'}`}
+          title="Spline 3D Animation"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          sandbox="allow-scripts allow-same-origin"
+          loading="lazy"
+        ></iframe>
       </div>
       
       {/* Stylish Welcome Button */}
@@ -145,8 +189,12 @@ const customStyles = `
 }
 `;
 
-const styleTag = document.createElement('style');
-styleTag.textContent = customStyles;
-document.head.appendChild(styleTag);
+// Only add the style tag once
+if (!document.getElementById('welcome-page-styles')) {
+  const styleTag = document.createElement('style');
+  styleTag.id = 'welcome-page-styles';
+  styleTag.textContent = customStyles;
+  document.head.appendChild(styleTag);
+}
 
 export default WelcomePage; 

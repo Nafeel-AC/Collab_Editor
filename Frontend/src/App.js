@@ -8,7 +8,8 @@ import Dashboard from './components/Dashboard';
 import Support from './components/Support';
 import ChatbotPage from './components/chatbot';
 import CreateRoom from './components/CreateRoom';
-import CodeEditor from './components/CodeEditor';
+import TaskBoard from './components/TaskBoard';
+
 import RobotAnimation from './components/RobotAnimation';
 import './App.css';
 
@@ -25,7 +26,7 @@ function App() {
         <Route path="/robot-animation" element={<RobotAnimation />} />
         <Route path="/chatbot" element={<ChatbotPage />} />
         <Route path="/create-room" element={<CreateRoom />} />
-        <Route path="/editor/:roomId" element={<CodeEditor />} />
+        <Route path="/tasks" element={<TaskBoard />} />
       </Routes>
     </Router>
   );

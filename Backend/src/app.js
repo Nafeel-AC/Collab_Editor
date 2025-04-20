@@ -30,16 +30,20 @@ app.get("/", (req, res) => {
 })
 
 // set the routes for the server
-import { router as userRouter } from "./routes/user.route.js";
+import userRouter from "./routes/user.route.js";
 import { router as roomRouter } from "./routes/room.route.js";
 import { router as executeRouter } from "./routes/execute.route.js";
 import { router as fileRouter } from "./routes/file.route.js";
 import { router as messageRouter } from "./routes/message.route.js";
+import snippetRouter from "./routes/snippet.route.js";
+import taskRouter from "./routes/task.route.js";
 
 app.use("/api/users", userRouter);
 app.use("/api/rooms", roomRouter);
 app.use("/api/execute", executeRouter);
 app.use("/api/files", fileRouter);
 app.use("/api/messages", messageRouter);
+app.use("/api/snippets", snippetRouter);
+app.use("/api", taskRouter);
 
 export { app };

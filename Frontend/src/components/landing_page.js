@@ -51,6 +51,13 @@ export default function LandingPage() {
               </Link>
 
               <Link
+                to="/tasks"
+                className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
+              >
+                Tasks
+              </Link>
+
+              <Link
                 to="/Support"
                 className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
               >

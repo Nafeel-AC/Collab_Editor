@@ -8,11 +8,16 @@ import {
 } from "./controllers/room.controller.js";
 import { Room } from "./models/room.model.js";
 import { File } from "./models/file.model.js";
+import { User } from "./models/user.model.js";
+import { Message } from "./models/message.model.js";
 
 let io;
 
 // Store connected users by room
 const roomUsers = new Map();
+
+// Store connected users by user ID
+const connectedUsers = new Map();
 
 export const initSocketServer = (server) => {
   io = new Server(server, {
@@ -44,6 +49,44 @@ export const initSocketServer = (server) => {
     // Store user's current room
     let currentRoom = null;
     let username = "Anonymous";
+    let userId = null;
+
+    // User authentication and tracking
+    socket.on("authenticate", ({ token, userId: authUserId }) => {
+      try {
+        if (!authUserId) {
+          console.log("No user ID provided for authentication");
+          socket.emit("error", { message: "No user ID provided for authentication" });
+          return;
+        }
+        
+        userId = authUserId;
+        
+        // Store socket ID by user ID for direct messaging
+        // If user already has a connected socket, disconnect the old one
+        const existingSocketId = connectedUsers.get(userId);
+        if (existingSocketId && existingSocketId !== socket.id) {
+          console.log(`User ${userId} already has a connected socket: ${existingSocketId}. Updating to new socket: ${socket.id}`);
+          // We don't forcibly disconnect as the user might have multiple tabs open
+        }
+        
+        connectedUsers.set(userId, socket.id);
+        
+        console.log(`User authenticated: ${userId} with socket: ${socket.id}`);
+        
+        // Join a private room for this user
+        socket.join(`user:${userId}`);
+        
+        // Send confirmation back to client
+        socket.emit("authenticated", { userId });
+        
+        // Debug: Log all authenticated users
+        console.log("Currently connected users:", Array.from(connectedUsers.entries()));
+      } catch (error) {
+        console.error("Authentication error:", error);
+        socket.emit("error", { message: "Authentication failed" });
+      }
+    });
 
     // Handle joining a room
     socket.on("join-room", async ({ roomId, username: joinUsername }) => {
@@ -154,6 +197,123 @@ export const initSocketServer = (server) => {
       }
     });
 
+    // ======= MESSAGING FUNCTIONALITY =======
+    
+    // Handle direct message
+    socket.on("send-direct-message", async ({ receiverId, message, refId }) => {
+      try {
+        if (!userId) {
+          console.error("Direct message attempted without authentication");
+          socket.emit("error", { message: "You must be authenticated to send messages" });
+          return;
+        }
+        
+        if (!receiverId || !message) {
+          console.error(`Invalid direct message data: receiverId=${receiverId}, message length=${message ? message.length : 0}`);
+          socket.emit("error", { message: "Invalid message data" });
+          return;
+        }
+        
+        console.log(`User ${userId} sending message to ${receiverId}: ${message.substring(0, 30)}${message.length > 30 ? '...' : ''} (ref: ${refId || 'none'})`);
+        
+        // Store message in database
+        const newMessage = new Message({
+          sender: userId,
+          receiver: receiverId,
+          text: message,
+          refId: refId || null, // Store reference ID if provided
+        });
+        
+        const savedMessage = await newMessage.save();
+        console.log(`Message saved to database with ID: ${savedMessage._id}, refId: ${refId || 'none'}`);
+        
+        // Get sender info
+        const sender = await User.findById(userId);
+        if (!sender) {
+          console.error(`Sender not found in database: ${userId}`);
+          socket.emit("error", { message: "Sender not found" });
+          return;
+        }
+        
+        // Format message for sending - ensure consistent format for both sender and receiver
+        const formattedMessage = {
+          id: savedMessage._id.toString(), // Convert ObjectId to string for consistency
+          senderId: userId,
+          senderName: sender.userName || "Unknown User", // Fallback if username missing
+          receiverId: receiverId,
+          text: message,
+          timestamp: savedMessage.createdAt,
+          refId: refId || null, // Include reference ID if provided
+          read: false,
+          pending: false // Mark as confirmed message since it's saved in DB
+        };
+        
+        console.log(`Formatted message: ${JSON.stringify(formattedMessage)}`);
+        
+        // Send confirmation to sender with the message ID from database
+        socket.emit("receive-direct-message", formattedMessage);
+        console.log(`Message confirmation sent back to sender: ${userId}`);
+        
+        // Check if receiver is online
+        const receiverSocketId = connectedUsers.get(receiverId);
+        
+        if (receiverSocketId) {
+          // Recipient is online, send to their room
+          console.log(`Attempting to deliver message to user:${receiverId} (socket: ${receiverSocketId})`);
+          
+          // Use io.to() to send to a room
+          io.to(`user:${receiverId}`).emit("receive-direct-message", formattedMessage);
+          
+          // Also try a direct socket delivery as backup
+          const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+          if (receiverSocket) {
+            receiverSocket.emit("receive-direct-message", formattedMessage);
+            console.log(`Message also sent directly to socket ${receiverSocketId}`);
+          } else {
+            console.log(`Socket ${receiverSocketId} not found in active sockets`);
+          }
+          
+          console.log(`Message sent to online user ${receiverId} via room user:${receiverId}`);
+        } else {
+          console.log(`User ${receiverId} is offline, message saved to database only`);
+        }
+      } catch (error) {
+        console.error("Error sending direct message:", error);
+        socket.emit("error", { message: "Failed to send message", details: error.message });
+        
+        // If there was a refId, send an error notification for the specific message
+        if (refId) {
+          socket.emit("message-error", { refId, error: error.message });
+        }
+      }
+    });
+    
+    // Handle message read status
+    socket.on("mark-messages-read", async ({ senderId }) => {
+      try {
+        if (!userId) {
+          socket.emit("error", { message: "You must be authenticated to mark messages" });
+          return;
+        }
+        
+        // Update read status in database
+        await Message.updateMany(
+          { sender: senderId, receiver: userId, read: false },
+          { read: true }
+        );
+        
+        console.log(`Messages from ${senderId} to ${userId} marked as read`);
+        
+        // Notify sender that messages were read
+        const senderSocketId = connectedUsers.get(senderId);
+        if (senderSocketId) {
+          io.to(`user:${senderId}`).emit("messages-read", { by: userId });
+        }
+      } catch (error) {
+        console.error("Error marking messages as read:", error);
+      }
+    });
+
     // Handle ping from clients to keep connection alive
     socket.on("ping", () => {
       socket.emit("pong");
@@ -194,6 +354,12 @@ export const initSocketServer = (server) => {
             socketId: p.socketId, 
             username: p.username 
           })));
+        }
+        
+        // Remove from connected users map
+        if (userId) {
+          connectedUsers.delete(userId);
+          console.log(`User ${userId} removed from connected users map`);
         }
       } catch (error) {
         console.error("Error handling disconnection:", error);
@@ -250,17 +416,16 @@ const removeUserFromRoom = (roomId, socketId) => {
   if (!roomUsers.has(roomId)) return;
   
   const users = roomUsers.get(roomId);
-  const filteredUsers = users.filter(user => user.socketId !== socketId);
+  const updatedUsers = users.filter(user => user.socketId !== socketId);
   
-  if (filteredUsers.length === 0) {
-    // Remove room if empty
+  if (updatedUsers.length === 0) {
     roomUsers.delete(roomId);
   } else {
-    roomUsers.set(roomId, filteredUsers);
+    roomUsers.set(roomId, updatedUsers);
   }
 }
 
 // Helper function to get users in a room
 const getRoomUsers = (roomId) => {
-  return roomUsers.has(roomId) ? roomUsers.get(roomId) : [];
-} 
+  return roomUsers.get(roomId) || [];
+}; 
