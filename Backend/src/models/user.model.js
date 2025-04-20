@@ -18,7 +18,19 @@ const userSchema = new mongoose.Schema ({
         required: true , 
         trim: true,
         min: 8,
-    }
+    },
+    friends: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    friendRequests: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    sentFriendRequests: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }]
 })
 
 /** helper methods of user for creating access and refresh token  */
