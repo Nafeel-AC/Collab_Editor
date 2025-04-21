@@ -69,11 +69,37 @@ async function registerUser (req , res) {
             userName: req.body.userName, 
             email: req.body.email, 
             password: req.body.password
-        })
+        });
+        
         await newUser.save();
-        return res.status(200).json({message: "User registered successfully"})
+        
+        // Create access token
+        const accessToken = newUser.createAccessToken();
+        const refreshToken = newUser.createRefreshToken();
+
+        // Send the access token as a cookie
+        res.cookie("accesstoken", accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: "lax",
+            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        });
+        res.cookie("refreshtoken", refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+        
+        // Return the token in the response
+        return res.status(200).json({
+            message: "User registered successfully",
+            userName: newUser.userName,
+            userId: newUser._id,
+            token: accessToken
+        });
     } catch(error) {
-        console.log(error)
+        console.log(error);
         res.status(400).json({error: error.message});
     }
 }
