@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
-import WelcomePage from './components/WelcomePage';
 import LandingPage from './components/landing_page';
 import LoginPage from './components/Loginpage';
 import SignupPage from './components/SignupPage';
@@ -31,7 +30,7 @@ function App() {
     <Router>
       <Routes>
         {/* Public routes */}
-        <Route exact path="/" element={<WelcomePage />} />
+        <Route exact path="/" element={<LandingPage />} />
         <Route path="/home" element={<LandingPage />} />
         <Route path="/LoginPage" element={<LoginPage />} />
         <Route path="/SignupPage" element={<SignupPage />} />
