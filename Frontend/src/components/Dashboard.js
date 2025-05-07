@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Navigate, useNavigate } from 'react-router-dom';
-import { Bell, Search, Plus, Code2, LogIn, MoreVertical, UserPlus, Check, X, Users, MessageSquare, Send, ChevronLeft, LogOut } from 'lucide-react';
+import { Bell, Search, Plus, Code2, LogIn, MoreVertical, UserPlus, Check, X, Users, MessageSquare, Send, ChevronLeft, LogOut, Settings } from 'lucide-react';
 import io from 'socket.io-client';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
 
 function Dashboard() {
   const location = useLocation();
@@ -14,6 +15,7 @@ function Dashboard() {
   const [userName, setUserName] = useState(localStorage.getItem('userName') || location.state?.username);
   const [isAuthenticated, setIsAuthenticated] = useState(!!token);
   const [socket, setSocket] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   
   // State for users, friends, and friend requests
   const [users, setUsers] = useState([]);
@@ -361,7 +363,9 @@ function Dashboard() {
                 name: friend.userName,
                 status: 'Online',
                 online: true,
-                avatar: `https://ui-avatars.com/api/?name=${friend.userName}&background=random`
+                avatar: friend.profilePic ? 
+                  (friend.profilePic.startsWith('http') ? friend.profilePic : `http://localhost:3050${friend.profilePic}`) : 
+                  `https://ui-avatars.com/api/?name=${friend.userName}&background=random`
               })));
             } else {
               console.error('Friends data is not an array:', friendsData);
@@ -392,7 +396,9 @@ function Dashboard() {
                 id: user._id,
                 name: user.userName,
                 email: user.email,
-                avatar: `https://ui-avatars.com/api/?name=${user.userName}&background=random`
+                avatar: user.profilePic ? 
+                  (user.profilePic.startsWith('http') ? user.profilePic : `http://localhost:3050${user.profilePic}`) : 
+                  `https://ui-avatars.com/api/?name=${user.userName}&background=random`
               })));
             } else {
               console.error('Friend requests data is not an array:', requestsData);
@@ -423,7 +429,9 @@ function Dashboard() {
                 id: user._id,
                 name: user.userName,
                 email: user.email,
-                avatar: `https://ui-avatars.com/api/?name=${user.userName}&background=random`
+                avatar: user.profilePic ? 
+                  (user.profilePic.startsWith('http') ? user.profilePic : `http://localhost:3050${user.profilePic}`) : 
+                  `https://ui-avatars.com/api/?name=${user.userName}&background=random`
               })));
             } else {
               console.error('Users data is not an array:', usersData);
@@ -480,7 +488,9 @@ function Dashboard() {
               id: user._id,
               name: user.userName,
               email: user.email,
-              avatar: `https://ui-avatars.com/api/?name=${user.userName}&background=random`
+              avatar: user.profilePic ? 
+                (user.profilePic.startsWith('http') ? user.profilePic : `http://localhost:3050${user.profilePic}`) : 
+                `https://ui-avatars.com/api/?name=${user.userName}&background=random`
             })));
           } else {
             console.error('Friend requests data is not an array:', refreshData);
@@ -510,6 +520,42 @@ function Dashboard() {
       return () => clearInterval(intervalId);
     }
   }, [activeTab, isAuthenticated, token]);
+  
+  // Get the current user's profile info
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        if (!token) return;
+        
+        const response = await axios.get(`http://localhost:3050/api/users/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          withCredentials: true
+        });
+        
+        // Process profile picture URL
+        let profileData = response.data;
+        console.log("Raw profile data:", profileData);
+        
+        if (profileData.profilePic && !profileData.profilePic.startsWith('http')) {
+          profileData.profilePic = `http://localhost:3050${profileData.profilePic}`;
+          console.log("Updated profile picture URL:", profileData.profilePic);
+        } else if (profileData.profilePic) {
+          console.log("Profile picture URL already has http:", profileData.profilePic);
+        } else {
+          console.log("No profile picture found in user data");
+        }
+        
+        setUserProfile(profileData);
+        console.log("Set user profile with picture:", profileData.profilePic);
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+      }
+    };
+
+    fetchUserProfile();
+  }, [token]);
   
   // Handle sending friend request
   const handleSendFriendRequest = async (userId) => {
@@ -583,7 +629,9 @@ function Dashboard() {
             name: responseData.requester.name,
             status: 'Online',
             online: true,
-            avatar: `https://ui-avatars.com/api/?name=${responseData.requester.name}&background=random`
+            avatar: responseData.requester.profilePic ? 
+              (responseData.requester.profilePic.startsWith('http') ? responseData.requester.profilePic : `http://localhost:3050${responseData.requester.profilePic}`) : 
+              `https://ui-avatars.com/api/?name=${responseData.requester.name}&background=random`
           }]);
         } else if (acceptedUser) {
           // Fallback to using local data
@@ -844,10 +892,24 @@ function Dashboard() {
         <div className="p-4 bg-[#1c1c1f] rounded-b-xl shadow-md border-b border-[#2f2f35]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-[#2a2a2e] flex items-center justify-center text-xl font-bold mr-3 border border-[#2f2f35]">
-                {userName?.charAt(0)?.toUpperCase() || 'U'}
-              </div>
-            <div>
+              {console.log("Rendering user profile:", userProfile)}
+              {userProfile?.profilePic ? (
+                <img 
+                  src={userProfile.profilePic} 
+                  alt={userName}
+                  className="h-10 w-10 rounded-full object-cover mr-3 border border-[#2f2f35]"
+                  onError={(e) => {
+                    console.error("Error loading profile image:", e);
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${userName || 'User'}&background=random`;
+                  }}
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-[#2a2a2e] flex items-center justify-center text-xl font-bold mr-3 border border-[#2f2f35]">
+                  {userName?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+              )}
+              <div>
                 <h3 className="font-bold tracking-wide text-[#e6e6e6]">{userName || 'User'}</h3>
                 <div className="text-xs flex items-center">
                   <span className={`h-2 w-2 rounded-full mr-2 ${
@@ -860,17 +922,26 @@ function Dashboard() {
                      socketStatus === 'connecting' ? 'Connecting...' : 
                      'Offline'}
                   </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex">
+              <button 
+                onClick={() => navigate('/ProfilePage')} 
+                className="text-[#a0a0a0] hover:text-[#3b82f6] transition-colors p-2 rounded-full hover:bg-[#2a2a2e] mr-1"
+                title="Profile Settings"
+              >
+                <Settings size={18} />
+              </button>
+              <button 
+                onClick={handleLogout} 
+                className="text-[#a0a0a0] hover:text-[#ef4444] transition-colors p-2 rounded-full hover:bg-[#2a2a2e]"
+                title="Logout"
+              >
+                <LogOut size={18} />
+              </button>
             </div>
           </div>
-            </div>
-            <button 
-              onClick={handleLogout} 
-              className="text-[#a0a0a0] hover:text-[#ef4444] transition-colors p-2 rounded-full hover:bg-[#2a2a2e]"
-              title="Logout"
-            >
-              <LogOut size={18} />
-            </button>
-        </div>
 
           {/* Create/Join Room buttons */}
           <div className="flex space-x-2 mt-3">
@@ -998,18 +1069,23 @@ function Dashboard() {
                           },
                           credentials: 'include',
                         });
+                        
                         if (response.ok) {
                           const friendsData = await response.json();
-                          setFriends(friendsData.map(friend => ({
-                            id: friend._id,
-                            name: friend.userName,
-                            status: 'Online',
-                            online: true,
-                            avatar: `https://ui-avatars.com/api/?name=${friend.userName}&background=random`
-                          })));
+                          if (Array.isArray(friendsData)) {
+                            setFriends(friendsData.map(friend => ({
+                              id: friend._id,
+                              name: friend.userName,
+                              status: 'Online',
+                              online: true,
+                              avatar: friend.profilePic ? 
+                                (friend.profilePic.startsWith('http') ? friend.profilePic : `http://localhost:3050${friend.profilePic}`) : 
+                                `https://ui-avatars.com/api/?name=${friend.userName}&background=random`
+                            })));
+                          }
                         }
                       } catch (err) {
-                        console.error('Error fetching friends:', err);
+                        console.error("Error fetching friends:", err);
                       }
                     };
                     fetchFriends();
@@ -1039,18 +1115,23 @@ function Dashboard() {
                           },
                           credentials: 'include',
                         });
+                        
                         if (response.ok) {
                           const friendsData = await response.json();
-                          setFriends(friendsData.map(friend => ({
-                            id: friend._id,
-                            name: friend.userName,
-                            status: 'Online',
-                            online: true,
-                            avatar: `https://ui-avatars.com/api/?name=${friend.userName}&background=random`
-                          })));
+                          if (Array.isArray(friendsData)) {
+                            setFriends(friendsData.map(friend => ({
+                              id: friend._id,
+                              name: friend.userName,
+                              status: 'Online',
+                              online: true,
+                              avatar: friend.profilePic ? 
+                                (friend.profilePic.startsWith('http') ? friend.profilePic : `http://localhost:3050${friend.profilePic}`) : 
+                                `https://ui-avatars.com/api/?name=${friend.userName}&background=random`
+                            })));
+                          }
                         }
                       } catch (err) {
-                        console.error('Error fetching friends:', err);
+                        console.error("Error fetching friends:", err);
                       }
                     };
                     fetchFriends();

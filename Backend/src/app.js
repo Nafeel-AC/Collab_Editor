@@ -2,11 +2,12 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
 const app = express();
 
 // set middlewares for the server
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'], // Allow specific origins for better security
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173'], // Allow specific origins for better security
   credentials: true, // Allow cookies to be sent
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -22,6 +23,8 @@ app.use(express.json({limit: '10mb'}));  // Increase limit for code submissions
 app.use(express.urlencoded({ extended: true }));       // parses the incoming requests (from forms and postman) with urlencoded payloads and place it to req.body
 app.use(cookieParser());
 
+// Serve static files from the public directory
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 app.get("/", (req, res) => {
     console.log("request on /");
@@ -31,7 +34,7 @@ app.get("/", (req, res) => {
 
 // set the routes for the server
 import userRouter from "./routes/user.route.js";
-import { router as roomRouter } from "./routes/room.route.js";
+import roomRouter from "./routes/room.route.js";
 import { router as executeRouter } from "./routes/execute.route.js";
 import { router as fileRouter } from "./routes/file.route.js";
 import { router as messageRouter } from "./routes/message.route.js";

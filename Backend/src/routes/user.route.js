@@ -12,9 +12,16 @@ import {
     getFriendRequests,
     getFriends,
     getCurrentUser,
-    checkFriendshipStatus
+    checkFriendshipStatus,
+    updateProfile,
+    updateTheme,
+    uploadProfilePicture,
+    deleteUser,
+    toggleAdminStatus,
+    getAllRegisteredUsers
 } from "../controllers/user.controller.js";
-import { verifyToken } from "../middlewares/auth.middleware.js";
+import { verifyToken, isAdmin } from "../middlewares/auth.middleware.js";
+import upload from "../middlewares/upload.middleware.js";
 const router = Router();
 
 router.route("/login-confirmation").post(loginConfirmation);
@@ -39,8 +46,20 @@ router.route("/refresh-token").post(refreshToken);
 // Current user route
 router.route("/me").get(verifyToken, getCurrentUser);
 
-// Friend-related routes
+// Profile routes
+router.route("/profile").put(verifyToken, updateProfile);
+router.route("/theme").put(verifyToken, updateTheme);
+router.route("/profile-picture").post(verifyToken, upload.single('profilePic'), uploadProfilePicture);
+
+// Get all users (for normal users - excludes friends and friend requests)
 router.route("/all").get(verifyToken, getAllUsers);
+
+// Admin routes (protected with isAdmin middleware)
+router.route("/all-users").get(verifyToken, isAdmin, getAllRegisteredUsers); // Get all registered users
+router.route("/:userId").delete(verifyToken, isAdmin, deleteUser); // Delete a user
+router.route("/:userId/admin").put(verifyToken, isAdmin, toggleAdminStatus); // Toggle admin status
+
+// Friend-related routes
 router.route("/friends").get(verifyToken, getFriends);
 router.route("/friend-requests").get(verifyToken, getFriendRequests);
 router.route("/send-friend-request").post(verifyToken, sendFriendRequest);

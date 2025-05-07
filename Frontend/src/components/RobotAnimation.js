@@ -1,23 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { TypewriterEffect } from './TypewriterEffect';
 
 const RobotAnimation = () => {
   const navigate = useNavigate();
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-
-  useEffect(() => {
-    // Load the Spline viewer script if it hasn't been loaded yet
-    if (!document.querySelector('script[src*="splinetool/viewer"]')) {
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = 'https://unpkg.com/@splinetool/viewer@1.9.82/build/spline-viewer.js';
-      script.async = true;
-      script.onload = () => setScriptLoaded(true);
-      document.head.appendChild(script);
-    } else {
-      setScriptLoaded(true);
-    }
-  }, []);
 
   return (
     <div className="h-screen w-screen bg-black relative overflow-hidden">
@@ -25,9 +12,27 @@ const RobotAnimation = () => {
         {/* Left side - Welcome text */}
         <div className="w-full md:w-1/2 flex flex-col justify-center items-start pl-8 md:pl-16 lg:pl-24 z-10">
           <div className="max-w-lg">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 mb-4">
-              Welcome to the AI Assistant
-            </h1>
+            <TypewriterEffect
+              words={[
+                {
+                  text: "Welcome",
+                  className: "text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500"
+                },
+                {
+                  text: " to the ",
+                  className: "text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500"
+                },
+                {
+                  text: "AI",
+                  className: "text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500"
+                },
+                {
+                  text: " Assistant",
+                  className: "text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-blue-400"
+                }
+              ]}
+              className="text-left mb-4"
+            />
             <p className="text-gray-300 text-lg md:text-xl mb-8">
               Your intelligent coding companion that helps you build better projects faster. Ask questions, get help with debugging, or generate new code.
             </p>
@@ -49,17 +54,13 @@ const RobotAnimation = () => {
         </div>
 
         {/* Right side - Animation */}
-        <div className="absolute right-0 w-full md:w-3/5 h-full">
-          {scriptLoaded ? (
-            <spline-viewer 
-              url="https://prod.spline.design/PiIBXn9DRONKpSrz/scene.splinecode"
-              className="w-full h-full"
-            ></spline-viewer>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="text-white text-2xl">Loading robot...</div>
-            </div>
-          )}
+        <div className="absolute right-0 w-full md:w-3/5 h-full flex items-center justify-center">
+          <DotLottieReact
+            src="https://lottie.host/2d7d728a-7f45-432a-b2d8-582934cdfd6c/xYJD9c2kZ9.lottie"
+            loop
+            autoplay
+            className="w-full h-full"
+          />
         </div>
       </div>
       

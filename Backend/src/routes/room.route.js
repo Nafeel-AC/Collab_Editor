@@ -1,6 +1,11 @@
 import { Router } from "express";
-import { createRoom, getRoomById } from "../controllers/room.controller.js";
-import { verifyToken } from "../middlewares/auth.middleware.js";
+import { 
+    createRoom, 
+    getRoomById, 
+    joinRoom, 
+    getActiveRooms 
+} from '../controllers/room.controller.js';
+import { verifyToken, isAdmin } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
@@ -10,4 +15,10 @@ router.route("/create").post(verifyToken, createRoom);
 // Get room details
 router.route("/:roomId").get(verifyToken, getRoomById);
 
-export { router }; 
+// Join a room
+router.route("/join").post(verifyToken, joinRoom);
+
+// Get active rooms (admin-only)
+router.route("/active").get(verifyToken, isAdmin, getActiveRooms);
+
+export default router; 

@@ -549,6 +549,205 @@ const checkFriendshipStatus = async (req, res) => {
     }
 };
 
+// Update user profile
+const updateProfile = async (req, res) => {
+    try {
+        const userId = req.userId;
+        
+        if (!userId) {
+            return res.status(401).json({ error: "Not authenticated" });
+        }
+        
+        const { userName, bio, location, skills, socialLinks, profilePic } = req.body;
+        
+        // Only update fields that were provided
+        const updateData = {};
+        if (userName) updateData.userName = userName;
+        if (bio !== undefined) updateData.bio = bio;
+        if (location !== undefined) updateData.location = location;
+        if (skills !== undefined) updateData.skills = skills;
+        if (socialLinks !== undefined) updateData.socialLinks = socialLinks;
+        if (profilePic) updateData.profilePic = profilePic;
+        
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            updateData,
+            { new: true }
+        ).select('-password');
+        
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        return res.status(200).json(updatedUser);
+    } catch (error) {
+        console.error("Error updating profile:", error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+// Update user theme preference
+const updateTheme = async (req, res) => {
+    try {
+        const userId = req.userId;
+        
+        if (!userId) {
+            return res.status(401).json({ error: "Not authenticated" });
+        }
+        
+        const { theme } = req.body;
+        
+        if (!theme || !['light', 'dark', 'system'].includes(theme)) {
+            return res.status(400).json({ error: "Invalid theme option" });
+        }
+        
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { theme },
+            { new: true }
+        ).select('-password');
+        
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        return res.status(200).json(updatedUser);
+    } catch (error) {
+        console.error("Error updating theme:", error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+// Upload profile picture
+const uploadProfilePicture = async (req, res) => {
+    try {
+        const userId = req.userId; // From auth middleware
+        
+        // Check if a file was uploaded
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded" });
+        }
+        
+        // Get the URL path that will be used to access the file
+        const fileUrl = `/uploads/${req.file.filename}`;
+        
+        // Update the user's profile with the new picture URL
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { profilePic: fileUrl },
+            { new: true } // Return the updated document
+        );
+        
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        return res.status(200).json({ 
+            message: "Profile picture updated successfully",
+            profilePic: fileUrl,
+            user: updatedUser
+        });
+    } catch (error) {
+        console.error("Error uploading profile picture:", error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+// Get all registered users (admin only)
+const getAllRegisteredUsers = async (req, res) => {
+    try {
+        console.log("Admin user ID requesting all users:", req.userId);
+        
+        // Get all users with relevant fields for admin dashboard
+        const users = await User.find({})
+            .select('_id userName email isAdmin role createdAt profilePic');
+        
+        console.log(`Found ${users.length} users in the database`);
+        
+        // Add debugging information
+        if (users.length === 0) {
+            console.log("No users found in the database");
+        }
+        
+        return res.status(200).json(users);
+    } catch (error) {
+        console.error("Error fetching all users:", error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+// Delete a user (admin only)
+const deleteUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // Check if user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        // Remove the user from friends lists and friend requests of other users
+        await User.updateMany(
+            { friends: userId },
+            { $pull: { friends: userId } }
+        );
+        
+        await User.updateMany(
+            { friendRequests: userId },
+            { $pull: { friendRequests: userId } }
+        );
+        
+        await User.updateMany(
+            { sentFriendRequests: userId },
+            { $pull: { sentFriendRequests: userId } }
+        );
+        
+        // Delete the user
+        await User.findByIdAndDelete(userId);
+        
+        return res.status(200).json({ message: "User deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting user:", error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+// Toggle admin status (admin only)
+const toggleAdminStatus = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { isAdmin } = req.body;
+        
+        // Check if boolean value was provided
+        if (typeof isAdmin !== 'boolean') {
+            return res.status(400).json({ error: "isAdmin must be a boolean value" });
+        }
+        
+        // Check if user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        // Update admin status
+        user.isAdmin = isAdmin;
+        await user.save();
+        
+        return res.status(200).json({ 
+            message: `User admin status updated successfully to ${isAdmin ? 'admin' : 'regular user'}`,
+            user: {
+                _id: user._id,
+                userName: user.userName,
+                isAdmin: user.isAdmin
+            }
+        });
+    } catch (error) {
+        console.error("Error toggling admin status:", error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 export {
     loginConfirmation, 
     registerUser, 
@@ -561,5 +760,11 @@ export {
     getFriendRequests,
     getFriends,
     getCurrentUser,
-    checkFriendshipStatus
+    checkFriendshipStatus,
+    updateProfile,
+    updateTheme,
+    uploadProfilePicture,
+    getAllRegisteredUsers,
+    deleteUser,
+    toggleAdminStatus
 };

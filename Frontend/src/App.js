@@ -8,6 +8,7 @@ import Support from './components/Support';
 import ChatbotPage from './components/chatbot';
 import CreateRoom from './components/CreateRoom';
 import TaskBoard from './components/TaskBoard';
+import ProfilePage from './components/ProfilePage';
 
 import RobotAnimation from './components/RobotAnimation';
 import './App.css';
@@ -41,6 +42,11 @@ function App() {
         <Route path="/Dashboard" element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/ProfilePage" element={
+          <ProtectedRoute>
+            <ProfilePage />
           </ProtectedRoute>
         } />
         <Route path="/chatbot" element={

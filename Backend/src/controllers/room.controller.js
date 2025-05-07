@@ -1,5 +1,6 @@
 import { Room } from "../models/room.model.js";
 import { v4 as uuidv4 } from "uuid";
+import { User } from '../models/user.model.js';
 
 // Generate a unique room ID
 const generateUniqueRoomId = () => {
@@ -237,5 +238,64 @@ export const getRoomDocument = async (roomId) => {
   } catch (error) {
     console.error("Error getting room document:", error);
     return null;
+  }
+};
+
+// Join a room
+export const joinRoom = async (req, res) => {
+  try {
+    const { roomId, username } = req.body;
+    
+    if (!roomId || !username) {
+      return res.status(400).json({ message: "Room ID and username are required" });
+    }
+    
+    // Check if room exists
+    const room = await Room.findOne({ roomId });
+    
+    if (!room) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+    
+    // Add user to participants list if not already there
+    const isParticipant = room.participants.some(p => p.username === username);
+    
+    if (!isParticipant) {
+      room.participants.push({
+        username,
+        joinedAt: new Date()
+      });
+      
+      await room.save();
+    }
+    
+    // Return room details
+    res.status(200).json({
+      message: "Joined room successfully",
+      roomId: room.roomId,
+      language: room.language,
+      document: room.document,
+      createdBy: room.createdBy,
+      participantCount: room.participants.length
+    });
+  } catch (error) {
+    console.error("Error joining room:", error);
+    res.status(500).json({ message: "Failed to join room", error: error.message });
+  }
+};
+
+// Get active rooms (admin only)
+export const getActiveRooms = async (req, res) => {
+    try {
+        // Get all active rooms with populated user data
+        const activeRooms = await Room.find({ isActive: true })
+            .populate('createdBy', 'userName profilePic')
+            .populate('participants', 'userName profilePic')
+            .sort({ createdAt: -1 });
+        
+        return res.status(200).json(activeRooms);
+    } catch (error) {
+        console.error('Error getting active rooms:', error);
+        return res.status(500).json({ error: 'Failed to get active rooms' });
   }
 }; 

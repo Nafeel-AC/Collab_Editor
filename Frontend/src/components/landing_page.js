@@ -6,12 +6,15 @@ import { CarouselDemo } from "./CarouselDemo";
 import { MacbookDemo } from "./MacbookDemo";
 import { Footer } from "./Footer";
 import { LogOut, User, ChevronDown } from "lucide-react";
+import { TypewriterEffectSmooth } from "./TypewriterEffect";
+import axios from "axios";
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
   // Check if user is logged in
   useEffect(() => {
@@ -21,6 +24,31 @@ export default function LandingPage() {
     if (token) {
       setIsAuthenticated(true);
       setUserName(storedUserName || "User");
+      
+      // Fetch user profile data to get the profile picture
+      const fetchUserProfile = async () => {
+        try {
+          const response = await axios.get(`http://localhost:3050/api/users/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            withCredentials: true
+          });
+          
+          // Process profile picture URL
+          let profileData = response.data;
+          if (profileData.profilePic && !profileData.profilePic.startsWith('http')) {
+            profileData.profilePic = `http://localhost:3050${profileData.profilePic}`;
+          }
+          
+          setUserProfile(profileData);
+          console.log("Loaded user profile:", profileData);
+        } catch (err) {
+          console.error('Error fetching user profile for landing page:', err);
+        }
+      };
+      
+      fetchUserProfile();
     }
   }, []);
 
@@ -124,15 +152,37 @@ export default function LandingPage() {
                   onClick={() => setShowDropdown(!showDropdown)}
                   className="flex items-center space-x-2 text-gray-400 hover:text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-all duration-200"
                 >
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center">
-                    <User size={16} className="text-white" />
-                  </div>
+                  {userProfile?.profilePic ? (
+                    <img 
+                      src={userProfile.profilePic} 
+                      alt={userName}
+                      className="h-10 w-10 rounded-full object-cover border-2 border-cyan-500 shadow-md shadow-cyan-500/20"
+                      onError={(e) => {
+                        console.error("Error loading profile image:", e);
+                        e.target.onerror = null;
+                        e.target.src = `https://ui-avatars.com/api/?name=${userName || 'User'}&background=random`;
+                      }}
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center shadow-md shadow-cyan-500/20">
+                      <User size={20} className="text-white" />
+                    </div>
+                  )}
                   <span className="font-medium">{userName}</span>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
                 </button>
 
                 {showDropdown && (
                   <div className="absolute top-full mt-1 right-0 bg-gray-900 border border-gray-700 rounded-md shadow-lg w-48 py-1 z-50">
+                    <button
+                      onClick={() => {
+                        navigate('/ProfilePage');
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
+                    >
+                      My Profile
+                    </button>
                     <Link
                       to="/Dashboard"
                       className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
@@ -163,21 +213,23 @@ export default function LandingPage() {
         <div className="px-4 mx-auto relative sm:px-6 lg:px-8 max-w-7xl">
           <div className="grid items-center grid-cols-1 gap-y-12 lg:grid-cols-2 gap-x-16">
             <div>
-              <GradientText
-                colors={[
-                  "#FF5733",
-                  "#C0C0C0",
-                  "#808080",
-                  "#1E90FF",
-                  "#A9A9A9",
-                  "#32CD32",
+              <TypewriterEffectSmooth
+                words={[
+                  {
+                    text: "Collaborative",
+                    className: "text-transparent bg-clip-text font-bold text-gray-400"
+                  },
+                  {
+                    text: "Code",
+                    className: "text-transparent bg-clip-text font-bold text-gray-400"
+                  },
+                  {
+                    text: "Editor",
+                    className: "text-transparent bg-clip-text font-bold text-gray-400"
+                  }
                 ]}
-                animationSpeed={4}
-                showBorder={false}
                 className="font-playfair italic text-4xl font-bold sm:text-5xl lg:text-6xl xl:text-7xl"
-              >
-                Collaborative Code Editor
-              </GradientText>
+              />
               <p className="mt-4 font-playfair italic text-lg font-normal text-gray-400 sm:mt-8">
                 Build your projects with your team in real-time. Share your
                 code, collaborate and get instant feedback.

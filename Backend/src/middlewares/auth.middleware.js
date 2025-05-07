@@ -2,54 +2,57 @@
 import jwt from "jsonwebtoken";
 import { User } from "../models/user.model.js";
 
-const verifyToken = async (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
     try {
-        console.log("Auth middleware called");
-        
-        // Get token from cookies, headers, or request body
+        // Get token from Authorization header (Bearer token) or from cookies
         const token = req.cookies?.accesstoken || 
-                     req.headers.authorization?.split(' ')[1] || 
-                     req.body.accesstoken;
+                    (req.headers.authorization && req.headers.authorization.split(' ')[1]) || 
+                    req.body.token;
 
-        // Check if token exists
         if (!token) {
-            console.log("No token provided");
-            return res.status(403).json({error: "A token is required for authentication"});
+            return res.status(401).json({ error: "Access denied. No token provided." });
         }
 
         try {
             // Verify the token
             const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-            const userId = decoded.userId;
-            
-            console.log("Token verified for user ID:", userId);
-            
-            // Find the user in the database
-            const user = await User.findById(userId).select("-password");
-            
-            if (!user) {
-                console.log("User not found for token");
-                return res.status(401).json({error: "Invalid token - user not found"});
-            }
-
-            // Add user and userId to the request
-            req.user = user;
-            req.userId = userId;
+            req.userId = decoded.userId;
             next();
-        } catch (tokenError) {
-            console.error("Token verification error:", tokenError.message);
-            
-            // Handle expired token
-            if (tokenError.name === 'TokenExpiredError') {
-                return res.status(401).json({error: "Token expired", expired: true});
-            }
-            
-            return res.status(401).json({error: "Invalid token"});
+        } catch (error) {
+            return res.status(401).json({ error: "Invalid token." });
         }
     } catch (error) {
         console.error("Auth middleware error:", error);
-        return res.status(401).json({error: `Authentication error: ${error.message}`});
+        return res.status(500).json({ error: "Internal server error." });
     }
 };
 
-export { verifyToken };
+// Middleware to check if user is admin
+export const isAdmin = async (req, res, next) => {
+    try {
+        // Get user from database (userId should be set by verifyToken middleware)
+        const user = await User.findById(req.userId);
+        
+        if (!user) {
+            console.log("User not found in isAdmin middleware for ID:", req.userId);
+            return res.status(404).json({ error: "User not found." });
+        }
+        
+        console.log("Checking admin status for user:", user.userName);
+        console.log("isAdmin flag:", user.isAdmin);
+        console.log("Role value:", user.role);
+        
+        // Check if user is admin (using both isAdmin flag and role field)
+        if (user.isAdmin !== true && user.role !== 'admin') {
+            console.log("Access denied - user is not admin");
+            return res.status(403).json({ error: "Access denied. Admin privileges required." });
+        }
+        
+        console.log("Admin access granted for user:", user.userName);
+        // User is admin, proceed to next middleware
+        next();
+    } catch (error) {
+        console.error("Admin check middleware error:", error);
+        return res.status(500).json({ error: "Internal server error." });
+    }
+};
