@@ -24,6 +24,76 @@ import {
 // Register the language with highlight.js
 hljs.registerLanguage("javascript", javascript)
 
+// Add a style element to force dark theme globally with bluish glow effects for chatbot
+const chatbotDarkModeStyle = `
+  body, html {
+    background-color: #0F0F13 !important;
+    color: white !important;
+    background-image: radial-gradient(circle at 15% 50%, rgba(77, 93, 254, 0.08) 0%, transparent 45%), 
+                      radial-gradient(circle at 85% 30%, rgba(77, 93, 254, 0.08) 0%, transparent 55%);
+    background-attachment: fixed;
+  }
+  
+  /* Add glowing effect to certain elements */
+  .glow-effect {
+    box-shadow: 0 0 25px rgba(77, 93, 254, 0.15);
+  }
+  
+  .card-glow {
+    box-shadow: 0 4px 20px -5px rgba(77, 93, 254, 0.25);
+  }
+  
+  .avatar-glow {
+    box-shadow: 0 0 15px rgba(77, 93, 254, 0.2);
+  }
+  
+  .input-glow:focus {
+    box-shadow: 0 0 10px rgba(77, 93, 254, 0.3);
+  }
+  
+  /* Custom scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(25, 25, 35, 0.5);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(77, 93, 254, 0.5);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(77, 93, 254, 0.7);
+  }
+  
+  /* Enhance message styling */
+  .message-user {
+    background: linear-gradient(135deg, #4D5DFE 0%, #3A4AE1 100%);
+    box-shadow: 0 4px 15px -3px rgba(77, 93, 254, 0.25);
+  }
+  
+  .message-bot {
+    background-color: rgba(20, 20, 27, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(42, 42, 58, 0.8);
+    box-shadow: 0 4px 15px -5px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Enhanced button effects */
+  .send-button {
+    background: linear-gradient(135deg, #4D5DFE 0%, #3A4AE1 100%);
+    box-shadow: 0 0 15px rgba(77, 93, 254, 0.3);
+  }
+  
+  .send-button:hover {
+    box-shadow: 0 0 20px rgba(77, 93, 254, 0.4);
+  }
+`;
+
 export default function ChatbotPage() {
   const [userInput, setUserInput] = useState("")
   const [chatHistory, setChatHistory] = useState([])
@@ -37,6 +107,19 @@ export default function ChatbotPage() {
   const [newChatName, setNewChatName] = useState("")
   const chatContainerRef = useRef(null)
   const textareaRef = useRef(null)
+
+  // Apply the custom dark theme style on component mount
+  useEffect(() => {
+    // Create a style element
+    const style = document.createElement('style');
+    style.textContent = chatbotDarkModeStyle;
+    document.head.appendChild(style);
+    
+    // Cleanup function to remove the style when component unmounts
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   // Adjust textarea height based on content
   useEffect(() => {
@@ -290,7 +373,7 @@ export default function ChatbotPage() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0d0d0d] text-[#f0f0f0]">
+    <div className="flex h-screen bg-[#0F0F13] text-white">
       {/* Mobile menu overlay */}
       <AnimatePresence>
         {isMenuOpen && (
@@ -312,90 +395,90 @@ export default function ChatbotPage() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
-            className="fixed md:relative z-20 w-72 h-full flex flex-col bg-[#121212] border-r border-[#2d2d2d] shadow-xl"
+            className="fixed md:relative z-20 w-72 h-full flex flex-col bg-[#14141B]/90 border-r border-[#2A2A3A] shadow-xl backdrop-blur-sm"
           >
             {/* Sidebar header */}
-            <div className="flex items-center justify-between p-4 border-b border-[#2d2d2d]">
-              <h1 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-[#8b5cf6] to-[#4f46e5]">AI Chatbot</h1>
+            <div className="flex items-center justify-between p-4 border-b border-[#2A2A3A]">
+              <h1 className="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-[#4D5DFE] to-[#3A4AE1]">AI Chatbot</h1>
               <div className="flex items-center space-x-2">
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
-            onClick={toggleTheme}
-                  className="p-2 rounded-full hover:bg-[#2d2d2d] transition-colors"
+                  onClick={toggleTheme}
+                  className="p-2 rounded-full hover:bg-[#2A2A3A]/50 transition-colors"
                 >
                   {isDarkMode ? <Sun size={18} className="text-[#a0a0a0]" /> : <Moon size={18} />}
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
-                onClick={toggleMenu}
-                  className="md:hidden p-2 rounded-full hover:bg-[#2d2d2d] transition-colors"
+                  onClick={toggleMenu}
+                  className="md:hidden p-2 rounded-full hover:bg-[#2A2A3A]/50 transition-colors"
                 >
                   <X size={18} className="text-[#a0a0a0]" />
                 </motion.button>
+              </div>
             </div>
-          </div>
 
             {/* New chat button */}
             <div className="p-4">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-            onClick={createNewChat}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg bg-[#2d2d2d] hover:bg-[#3d3d3d] text-white font-medium border border-[#3d3d3d] shadow-lg hover:shadow-[#4f46e5]/10 transition-all duration-300"
+                onClick={createNewChat}
+                className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg bg-[#4D5DFE]/10 hover:bg-[#4D5DFE]/20 text-white font-medium border border-[#4D5DFE]/20 shadow-lg glow-effect transition-all duration-300"
               >
-                <Plus size={18} className="text-[#4f46e5]" />
+                <Plus size={18} className="text-[#4D5DFE]" />
                 <span>New Chat</span>
               </motion.button>
             </div>
 
             {/* Chat list */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
               <div className="p-2">
-                <h2 className="px-2 text-sm font-medium uppercase text-[#777777] mb-2">Recent Conversations</h2>
-            {conversations.map((conv) => (
+                <h2 className="px-2 text-sm font-medium uppercase text-[#8F8FA3] mb-2">Recent Conversations</h2>
+                {conversations.map((conv) => (
                   <motion.div
-                key={conv.id}
+                    key={conv.id}
                     whileHover={{ scale: 1.02, x: 4 }}
-                onClick={() => switchConversation(conv.id)}
+                    onClick={() => switchConversation(conv.id)}
                     className={`flex items-center justify-between p-3 mb-1 rounded-lg cursor-pointer group ${
                       activeConversation === conv.id
-                        ? "bg-[#2d2d2d] text-white border border-[#3d3d3d]"
-                        : "hover:bg-[#1d1d1d] text-[#a0a0a0]"
+                        ? "bg-[#2A2A3A]/70 text-white border border-[#2A2A3A] card-glow"
+                        : "hover:bg-[#1E1E29]/60 text-[#D1D1E0]"
                     } transition-all duration-200`}
                   >
                     <div className="flex items-center space-x-3 truncate">
-                      <div className="flex-shrink-0 p-2 rounded-md bg-[#242424] border border-[#3d3d3d]">
-                        <MessageSquare size={14} className="text-[#4f46e5]" />
-                  </div>
+                      <div className="flex-shrink-0 p-2 rounded-md bg-[#4D5DFE]/10 border border-[#4D5DFE]/20">
+                        <MessageSquare size={14} className="text-[#4D5DFE]" />
+                      </div>
                       <span className="truncate text-sm">{conv.title}</span>
                     </div>
                     <motion.button
                       whileHover={{ scale: 1.2 }}
                       whileTap={{ scale: 0.8 }}
-                  onClick={(e) => deleteConversation(conv.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-[#363636] text-[#777777] hover:text-white transition-opacity"
+                      onClick={(e) => deleteConversation(conv.id, e)}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-[#363636] text-[#8F8FA3] hover:text-white transition-opacity"
                     >
                       <Trash size={14} />
                     </motion.button>
                   </motion.div>
                 ))}
               </div>
-          </div>
+            </div>
 
             {/* Sidebar footer - Link to landing page */}
-            <div className="p-4 border-t border-[#2d2d2d] mt-auto">
+            <div className="p-4 border-t border-[#2A2A3A] mt-auto">
               <Link to="/home">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
-                  className="w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-lg bg-[#1a1a1a] hover:bg-[#242424] text-[#a0a0a0] border border-[#2d2d2d] text-sm font-medium transition-colors"
+                  className="w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-lg bg-[#1E1E29]/80 hover:bg-[#1E1E29] text-[#8F8FA3] border border-[#2A2A3A] text-sm font-medium transition-colors"
                 >
                   <ArrowLeft size={16} />
                   <span>Back to Home</span>
                 </motion.button>
               </Link>
-              </div>
+            </div>
           </motion.aside>
         )}
       </AnimatePresence>
@@ -403,18 +486,18 @@ export default function ChatbotPage() {
       {/* Main content */}
       <div className="flex-1 flex flex-col h-full relative">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#2d2d2d] bg-[#0d0d0d] shadow-md">
+        <div className="flex items-center justify-between p-4 border-b border-[#2A2A3A] bg-[#14141B]/90 shadow-md backdrop-blur-sm">
           <div className="flex items-center">
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={toggleMenu}
-              className="md:hidden p-2 mr-2 rounded-full hover:bg-[#2d2d2d] text-[#a0a0a0]"
+              className="md:hidden p-2 mr-2 rounded-full hover:bg-[#2A2A3A]/50 text-[#8F8FA3]"
             >
               <Menu size={18} />
             </motion.button>
             
-            <h2 className="font-medium truncate text-[#e0e0e0]">
+            <h2 className="font-medium truncate text-[#D1D1E0]">
               {conversations.find((conv) => conv.id === activeConversation)?.title || "New Chat"}
             </h2>
           </div>
@@ -423,7 +506,7 @@ export default function ChatbotPage() {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={toggleSidebar}
-            className="hidden md:block p-2 rounded-full hover:bg-[#2d2d2d] text-[#a0a0a0]"
+            className="hidden md:block p-2 rounded-full hover:bg-[#2A2A3A]/50 text-[#8F8FA3]"
           >
             {isSidebarOpen ? <PanelLeft size={18} /> : <PanelRight size={18} />}
           </motion.button>
@@ -432,9 +515,9 @@ export default function ChatbotPage() {
         {/* Chat container */}
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-4 md:p-6"
+          className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar"
           style={{
-            backgroundImage: "radial-gradient(circle at center, rgba(25, 25, 25, 0.2) 0%, rgba(13, 13, 13, 0.5) 100%)"
+            backgroundImage: "radial-gradient(circle at 25% 25%, rgba(77, 93, 254, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(77, 93, 254, 0.03) 0%, transparent 50%)"
           }}
         >
           <div className="max-w-3xl mx-auto space-y-6">
@@ -444,13 +527,13 @@ export default function ChatbotPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-center p-8 rounded-xl bg-[#121212] border border-[#2d2d2d] shadow-lg backdrop-blur-sm"
+                className="text-center p-8 rounded-xl bg-[#14141B]/80 border border-[#2A2A3A] shadow-lg backdrop-blur-sm card-glow"
               >
-                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-[#4f46e5] to-[#8b5cf6] border border-[#3d3d3d]">
+                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-[#4D5DFE] to-[#3A4AE1] border border-[#2A2A3A] avatar-glow">
                   <MessageSquare size={24} className="text-white" />
                 </div>
-                <h3 className="text-lg font-bold mb-2 text-[#f0f0f0]">Welcome to AI Chatbot</h3>
-                <p className="text-[#a0a0a0] mb-4">Ask me anything and I'll do my best to help!</p>
+                <h3 className="text-lg font-bold mb-2 text-white">Welcome to AI Chatbot</h3>
+                <p className="text-[#8F8FA3] mb-6">Ask me anything and I'll do my best to help!</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-md mx-auto text-sm">
                   {["How can I learn React?", "Write a poem about coding", "What are the best practices for API design?", "Explain quantum computing"].map((suggestion, index) => (
                     <motion.button
@@ -458,7 +541,7 @@ export default function ChatbotPage() {
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => setUserInput(suggestion)}
-                      className="p-2 rounded-lg text-left truncate bg-[#242424] hover:bg-[#363636] text-[#e0e0e0] border border-[#3d3d3d]"
+                      className="p-2 rounded-lg text-left truncate bg-[#1E1E29]/80 hover:bg-[#2A2A3A]/70 text-[#D1D1E0] border border-[#2A2A3A] transition-colors"
                     >
                       {suggestion}
                     </motion.button>
@@ -480,8 +563,8 @@ export default function ChatbotPage() {
                   <div
                     className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 ${
                       message.sender === "user"
-                        ? "bg-gradient-to-r from-[#4f46e5] to-[#8b5cf6] text-white rounded-tr-none shadow-lg shadow-[#4f46e5]/10"
-                        : "bg-[#1a1a1a] text-[#f0f0f0] rounded-tl-none border border-[#2d2d2d] shadow-md"
+                        ? "message-user text-white rounded-tr-none"
+                        : "message-bot text-white rounded-tl-none"
                     }`}
                   >
                     <div className="prose prose-sm max-w-none">
@@ -499,70 +582,70 @@ export default function ChatbotPage() {
                 animate={{ opacity: 1 }}
                 className="flex justify-start"
               >
-                <div className="max-w-[75%] rounded-2xl px-4 py-3 bg-[#1a1a1a] text-[#a0a0a0] border border-[#2d2d2d]">
+                <div className="max-w-[75%] rounded-2xl px-4 py-3 bg-[#14141B]/80 text-[#8F8FA3] border border-[#2A2A3A] backdrop-blur-sm">
                   <div className="flex space-x-2 items-center">
-                    <div className="w-2 h-2 rounded-full bg-[#4f46e5] animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                    <div className="w-2 h-2 rounded-full bg-[#4f46e5] animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                    <div className="w-2 h-2 rounded-full bg-[#4f46e5] animate-bounce" style={{ animationDelay: "300ms" }}></div>
-              </div>
-            </div>
+                    <div className="w-2 h-2 rounded-full bg-[#4D5DFE] animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                    <div className="w-2 h-2 rounded-full bg-[#4D5DFE] animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                    <div className="w-2 h-2 rounded-full bg-[#4D5DFE] animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                  </div>
+                </div>
               </motion.div>
             )}
           </div>
         </div>
 
         {/* Input area */}
-        <div className="p-4 border-t border-[#2d2d2d] bg-[#0d0d0d]">
+        <div className="p-4 border-t border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm">
           <div className="max-w-3xl mx-auto relative">
             {/* Rename chat interface */}
-                    {isNamingChat ? (
+            {isNamingChat ? (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-4 rounded-lg bg-[#1a1a1a] border border-[#2d2d2d]"
+                className="mb-4 p-4 rounded-lg bg-[#1E1E29]/90 border border-[#2A2A3A] card-glow backdrop-blur-sm"
               >
-                <label className="block text-sm font-medium mb-2 text-[#a0a0a0]">Name this conversation</label>
+                <label className="block text-sm font-medium mb-2 text-[#8F8FA3]">Name this conversation</label>
                 <div className="flex space-x-2">
-                          <input
-                            type="text"
-                            value={newChatName}
-                            onChange={(e) => setNewChatName(e.target.value)}
+                  <input
+                    type="text"
+                    value={newChatName}
+                    onChange={(e) => setNewChatName(e.target.value)}
                     onKeyPress={handleNameKeyPress}
                     placeholder="Enter a name for this chat"
-                    className="flex-1 rounded-lg p-2 bg-[#0d0d0d] border border-[#3d3d3d] text-[#e0e0e0] focus:border-[#4f46e5] focus:outline-none focus:ring-1 focus:ring-[#4f46e5]"
-                            autoFocus
-                          />
+                    className="flex-1 rounded-lg p-2 bg-[#0F0F13] border border-[#2A2A3A] text-white focus:border-[#4D5DFE] focus:outline-none input-glow transition-colors"
+                    autoFocus
+                  />
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                            onClick={saveChatName}
-                    className="px-4 py-2 rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white shadow-md shadow-[#4f46e5]/20"
-                          >
-                            Save
+                    onClick={saveChatName}
+                    className="px-4 py-2 rounded-lg bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white shadow-md glow-effect"
+                  >
+                    Save
                   </motion.button>
                 </div>
               </motion.div>
             ) : null}
 
             {/* Message input */}
-            <div className="flex items-end space-x-2 rounded-xl p-2 bg-[#1a1a1a] border border-[#2d2d2d] shadow-lg">
-                <textarea
-                  ref={textareaRef}
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
+            <div className="flex items-end space-x-2 rounded-xl p-2 bg-[#1E1E29]/80 border border-[#2A2A3A] shadow-lg backdrop-blur-sm">
+              <textarea
+                ref={textareaRef}
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
-                className="flex-1 resize-none overflow-y-auto max-h-28 p-3 rounded-lg bg-[#0d0d0d] text-[#f0f0f0] placeholder-[#666666] border border-[#2d2d2d] focus:border-[#4f46e5] focus:ring-0 focus:outline-none transition-colors"
+                className="flex-1 resize-none overflow-y-auto max-h-28 p-3 rounded-lg bg-[#14141B]/70 text-white placeholder-[#8F8FA3] border border-[#2A2A3A] focus:border-[#4D5DFE] focus:ring-0 focus:outline-none input-glow transition-colors"
               />
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                  onClick={handleSendMessage}
+                onClick={handleSendMessage}
                 disabled={!userInput.trim() || isLoading}
                 className={`p-3 rounded-full transition-all ${
                   !userInput.trim() || isLoading
-                    ? "bg-[#242424] text-[#666666] cursor-not-allowed border border-[#2d2d2d]"
-                    : "bg-gradient-to-r from-[#4f46e5] to-[#8b5cf6] text-white shadow-lg hover:shadow-[#4f46e5]/30"
+                    ? "bg-[#1E1E29] text-[#8F8FA3] cursor-not-allowed border border-[#2A2A3A]"
+                    : "send-button text-white"
                 }`}
               >
                 <Send size={20} />

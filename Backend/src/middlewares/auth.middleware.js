@@ -10,6 +10,7 @@ export const verifyToken = async (req, res, next) => {
                     req.body.token;
 
         if (!token) {
+            console.log("No token provided in request");
             return res.status(401).json({ error: "Access denied. No token provided." });
         }
 
@@ -17,8 +18,19 @@ export const verifyToken = async (req, res, next) => {
             // Verify the token
             const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
             req.userId = decoded.userId;
+            
+            // Fetch user from database to get username
+            const user = await User.findById(decoded.userId);
+            if (user) {
+                req.userName = user.userName;
+                console.log(`Authenticated user: ${user.userName} (${decoded.userId})`);
+            } else {
+                console.log(`User not found for ID: ${decoded.userId}`);
+            }
+            
             next();
         } catch (error) {
+            console.log("Token verification failed:", error.message);
             return res.status(401).json({ error: "Invalid token." });
         }
     } catch (error) {

@@ -40,6 +40,7 @@ import { router as fileRouter } from "./routes/file.route.js";
 import { router as messageRouter } from "./routes/message.route.js";
 import snippetRouter from "./routes/snippet.route.js";
 import taskRouter from "./routes/task.route.js";
+import projectRouter from "./routes/project.route.js";
 
 app.use("/api/users", userRouter);
 app.use("/api/rooms", roomRouter);
@@ -47,6 +48,7 @@ app.use("/api/execute", executeRouter);
 app.use("/api/files", fileRouter);
 app.use("/api/messages", messageRouter);
 app.use("/api/snippets", snippetRouter);
-app.use("/api", taskRouter);
+app.use("/api/tasks", taskRouter);
+app.use("/api/projects", projectRouter);
 
 export { app };

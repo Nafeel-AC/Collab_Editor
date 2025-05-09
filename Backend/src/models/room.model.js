@@ -34,6 +34,28 @@ const roomSchema = new mongoose.Schema({
       default: Date.now,
     },
   }],
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  closedAt: {
+    type: Date,
+    default: null,
+  },
+  // Fields to track the original project
+  originalProjectId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project',
+    default: null
+  },
+  projectName: {
+    type: String,
+    default: null
+  },
+  isProjectRoom: {
+    type: Boolean,
+    default: false
+  }
 }, { timestamps: true });
 
 // Clear any existing indexes that might be causing issues

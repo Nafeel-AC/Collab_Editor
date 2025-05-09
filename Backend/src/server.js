@@ -1,9 +1,11 @@
 // main entry point for the server 
 import http from "http";
 import dotenv from "dotenv";
+import { Server } from "socket.io";
 import { connect_DB } from "./config/db.js";
 import { app } from "./app.js";
-import { initSocketServer } from "./socketServer.js";
+// Import only what we're using
+import { initSimpleCollabSocket } from "./simpleCollab.js";
 
 dotenv.config({
     path: "./.env",
@@ -15,9 +17,10 @@ const server = http.createServer(app);
 // set up the server
 const PORT = process.env.PORT || 3050; // Make sure port matches frontend
 
-// Initialize Socket.IO server
-const io = initSocketServer(server);
-console.log("Socket.IO server initialized");
+// Do NOT create a Socket.IO instance here
+// Just pass the server to initSimpleCollabSocket which will create its own Socket.IO instance
+console.log("Initializing simple collaborative editing socket server...");
+initSimpleCollabSocket(server);
 
 // setting up the routes
 connect_DB().then(() => {

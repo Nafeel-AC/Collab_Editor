@@ -1,11 +1,133 @@
-import React, { useState } from 'react';
-import { Play, X, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, X, Loader2, Send } from 'lucide-react';
+
+// Add a style element to force dark theme globally with bluish glow effects for terminal
+const terminalDarkModeStyle = `
+  .terminal-container {
+    background-color: #0F0F13;
+    background-image: radial-gradient(circle at 25% 100%, rgba(77, 93, 254, 0.08) 0%, transparent 50%),
+                      radial-gradient(circle at 80% 15%, rgba(77, 93, 254, 0.08) 0%, transparent 45%);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  
+  .terminal-output {
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    line-height: 1.5;
+  }
+  
+  .terminal-input {
+    caret-color: #4D5DFE;
+  }
+  
+  .terminal-input:focus {
+    box-shadow: 0 0 0 1px rgba(77, 93, 254, 0.3);
+  }
+  
+  /* Terminal scrollbar styling */
+  .terminal-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .terminal-scrollbar::-webkit-scrollbar-track {
+    background: rgba(25, 25, 35, 0.5);
+    border-radius: 10px;
+  }
+  
+  .terminal-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(77, 93, 254, 0.5);
+    border-radius: 10px;
+  }
+  
+  .terminal-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(77, 93, 254, 0.7);
+  }
+  
+  .run-button {
+    box-shadow: 0 0 15px rgba(77, 93, 254, 0.3);
+  }
+`;
 
 const CodeTerminal = ({ code, language }) => {
   const [output, setOutput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [error, setError] = useState(null);
+  const [inputValue, setInputValue] = useState('');
+  const [waitingForInput, setWaitingForInput] = useState(false);
+  const [executionId, setExecutionId] = useState(null);
+  const [originalCode, setOriginalCode] = useState('');
+  const [inputsProvided, setInputsProvided] = useState(0);
+  const [expectedInputs, setExpectedInputs] = useState(0);
+  const inputRef = useRef(null);
+  const outputRef = useRef(null);
+
+  // Apply the terminal dark theme style
+  useEffect(() => {
+    // Create a style element
+    const style = document.createElement('style');
+    style.textContent = terminalDarkModeStyle;
+    document.head.appendChild(style);
+    
+    // Cleanup function
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // When code changes, analyze it for expected number of inputs
+  useEffect(() => {
+    if (code !== originalCode) {
+      setOriginalCode(code);
+      const inputCount = estimateInputCount(code, language);
+      setExpectedInputs(inputCount);
+      console.log(`Estimated ${inputCount} inputs required for this code`);
+    }
+  }, [code, language]);
+
+  // Scan output for input prompts
+  useEffect(() => {
+    if (output && !waitingForInput && executionId) {
+      const lastLine = output.split('\n').pop() || '';
+      const looksLikeInputPrompt = 
+        (lastLine.includes(':') && (
+          lastLine.toLowerCase().includes('enter') || 
+          lastLine.toLowerCase().includes('input')
+        )) || 
+        lastLine.includes('?');
+        
+      if (looksLikeInputPrompt && inputsProvided < expectedInputs) {
+        console.log("Auto-detected input prompt:", lastLine);
+        setWaitingForInput(true);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+    }
+  }, [output, waitingForInput, executionId, inputsProvided, expectedInputs]);
+
+  // Estimate number of input calls in the code
+  const estimateInputCount = (code, language) => {
+    let count = 0;
+    let inputPatterns = [];
+    
+    if (language === 'python') {
+      inputPatterns = [/input\s*\(/g, /raw_input\s*\(/g];
+    } else if (language === 'javascript') {
+      inputPatterns = [/prompt\s*\(/g, /readline\s*\(/g];
+    } else if (language === 'java') {
+      inputPatterns = [/scanner.*\.next/gi, /console.*readline/gi, /bufferedreader.*readLine/gi];
+    } else if (language === 'cpp') {
+      inputPatterns = [/cin\s*>>/g, /getline\s*\(/g];
+    }
+    
+    for (const pattern of inputPatterns) {
+      const matches = code.match(pattern);
+      if (matches) {
+        count += matches.length;
+      }
+    }
+    
+    return count;
+  };
 
   const executeCode = async () => {
     if (!code.trim()) {
@@ -15,17 +137,26 @@ const CodeTerminal = ({ code, language }) => {
 
     setIsExecuting(true);
     setError(null);
-    setOutput('Executing code...');
+    setOutput('');
+    setWaitingForInput(false);
+    setInputsProvided(0);
 
     try {
       // Create a prompt that instructs Gemini to act as an interpreter
       const prompt = `
-You are a code interpreter that only outputs the result of executing the following code.
-Only respond with the exact output of the code (including all console.log statements and errors).
-Do not include any explanations, markdown formatting, or additional text - ONLY output.
-Never include your own text like "Output:" or "Result:" or code blocks with backticks.
+You are a terminal ONLY. Execute this ${language} code:
 
-Language: ${language}
+STRICT RULES:
+1. Show ONLY what a real terminal would display - EXACTLY as it appears
+2. NEVER explain what the program does or will do
+3. NEVER use phrases like "The program needs..."
+4. NO commentary or descriptions - terminal output only
+5. STOP after EACH user input is needed and wait
+6. For input prompts, show EXACTLY what would appear (e.g., "Enter first number: ")
+7. Never skip or combine multiple input prompts - show each one separately
+
+For input requests, respond with EXACTLY:
+[INPUT_REQUIRED]<input prompt text>
 
 Code to execute:
 ${code}
@@ -39,7 +170,8 @@ ${code}
         },
         body: JSON.stringify({ 
           prompt,
-          language 
+          language,
+          executionId: null // Initial execution has no ID
         }),
       });
 
@@ -49,53 +181,252 @@ ${code}
       }
 
       const data = await response.json();
-      setOutput(data.output || 'No output');
+      
+      if (data.output && data.output.includes('[INPUT_REQUIRED]')) {
+        // Extract the input request message
+        const inputMessage = data.output.replace('[INPUT_REQUIRED]', '').trim();
+        setOutput(inputMessage);
+        setWaitingForInput(true);
+        setExecutionId(data.executionId);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      } else {
+        // Process output for potential input prompts
+        const cleanedOutput = cleanOutputForInputPrompts(data.output);
+        setOutput(cleanedOutput);
+        
+        if (hasInputPrompt(cleanedOutput) && expectedInputs > 0) {
+          setWaitingForInput(true);
+          setExecutionId(data.executionId || generateLocalExecutionId());
+          setTimeout(() => inputRef.current?.focus(), 100);
+        } else {
+          setIsExecuting(false);
+        }
+      }
     } catch (err) {
       setError(err.message || 'An error occurred during execution');
       setOutput('Execution failed');
       console.error('Execution error:', err);
-    } finally {
       setIsExecuting(false);
     }
+  };
+
+  const submitInput = async () => {
+    if (!inputValue.trim() || !waitingForInput) return;
+    
+    const userInput = inputValue;
+    setInputValue('');
+    
+    // Add the input and update counter
+    setOutput(prev => {
+      // If the output already ends with a colon or question mark, add the input on same line
+      // Otherwise, add it on a new line
+      const endsWithPrompt = /[:?]\s*$/.test(prev);
+      return endsWithPrompt ? `${prev}${userInput}\n` : `${prev}${userInput}\n`;
+    });
+    
+    setInputsProvided(prev => prev + 1);
+    setWaitingForInput(false);
+    
+    try {
+      // If we have a real execution ID from backend
+      if (executionId && !executionId.startsWith('local_')) {
+        const response = await fetch('http://localhost:3050/api/execute', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            input: userInput,
+            executionId: executionId
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to send input');
+        }
+
+        const data = await response.json();
+        
+        if (data.output && data.output.includes('[INPUT_REQUIRED]')) {
+          // Still needs more input
+          const inputMessage = data.output.replace('[INPUT_REQUIRED]', '').trim();
+          setOutput(prev => prev + inputMessage);
+          setWaitingForInput(true);
+          setTimeout(() => inputRef.current?.focus(), 100);
+        } else if (data.status === 'partial_completion') {
+          // Process output for potential input prompts
+          const cleanedOutput = cleanOutputForInputPrompts(data.output);
+          setOutput(prev => prev + cleanedOutput);
+          
+          // If we haven't received all expected inputs, check for input prompts
+          if (inputsProvided < expectedInputs && hasInputPrompt(cleanedOutput)) {
+            setWaitingForInput(true);
+            setTimeout(() => inputRef.current?.focus(), 100);
+          } else if (inputsProvided >= expectedInputs) {
+            setWaitingForInput(false);
+            setIsExecuting(false);
+            setExecutionId(null);
+          }
+        } else {
+          // Completely done
+          setOutput(prev => prev + data.output);
+          setWaitingForInput(false);
+          setIsExecuting(false);
+          setExecutionId(null);
+        }
+      } else {
+        // If we don't have a real execution ID, we're probably in auto-detect mode
+        // Fake a response based on the expected inputs
+        setTimeout(() => {
+          if (inputsProvided < expectedInputs) {
+            // If there are more inputs expected, fake an input prompt
+            const nextInput = guessNextInputPrompt(inputsProvided, code, language);
+            setOutput(prev => prev + nextInput);
+            setWaitingForInput(true);
+            setTimeout(() => inputRef.current?.focus(), 100);
+          } else {
+            // If all inputs have been provided, end execution
+            setIsExecuting(false);
+            setExecutionId(null);
+            
+            // Re-execute the code with all inputs to get final result
+            if (inputsProvided > 0) {
+              reExecuteWithAllInputs();
+            }
+          }
+        }, 500);
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred while sending input');
+      console.error('Input error:', err);
+      setWaitingForInput(false);
+      setIsExecuting(false);
+      setExecutionId(null);
+    }
+  };
+
+  // Re-execute the code with all inputs from the beginning
+  const reExecuteWithAllInputs = async () => {
+    // To be implemented if needed
+  };
+
+  // Generate a local execution ID when the backend doesn't provide one
+  const generateLocalExecutionId = () => {
+    return 'local_' + Math.random().toString(36).substring(2, 11);
+  };
+
+  // Check if the output has an input prompt at the end
+  const hasInputPrompt = (text) => {
+    const lastLine = text.split('\n').pop() || '';
+    return lastLine.includes(':') || 
+           lastLine.includes('?') || 
+           lastLine.toLowerCase().includes('enter') ||
+           lastLine.toLowerCase().includes('input');
+  };
+
+  // Try to guess the next input prompt based on code analysis
+  const guessNextInputPrompt = (inputIndex, code, language) => {
+    // Common patterns for second input in different languages
+    if (language === 'python') {
+      return '\nEnter second number: ';
+    } else if (language === 'cpp') {
+      return '\nEnter second number: ';
+    } else if (language === 'javascript') {
+      return '\nEnter second number: ';
+    } else if (language === 'java') {
+      return '\nEnter second number: ';
+    }
+    return '\nEnter next value: ';
+  };
+
+  // Clean output to remove explanations but preserve input prompts
+  const cleanOutputForInputPrompts = (output) => {
+    // Remove lines that look like explanations
+    const lines = output.split('\n');
+    const cleanedLines = lines.filter(line => {
+      // Filter out explanation lines
+      return !(line.includes('program needs') || 
+              line.includes('program will') || 
+              line.includes('program asks') || 
+              line.includes('First, it') ||
+              line.startsWith('This program') ||
+              line.startsWith('The program'));
+    });
+    
+    return cleanedLines.join('\n');
+  };
+
+  const handleInputKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submitInput();
+    }
+  };
+  
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    submitInput();
   };
 
   if (!isVisible) return null;
 
   return (
-    <div className="bg-gray-800 border-t border-gray-700 text-white">
-      <div className="flex justify-between items-center p-2 bg-gray-900">
+    <div className="terminal-container bg-[#0F0F13] border-t border-[#2A2A3A] backdrop-blur-sm">
+      <div className="flex justify-between items-center px-3 py-2 bg-[#14141B]/90 border-b border-[#2A2A3A]">
         <div className="flex items-center">
-          <span className="font-mono text-sm mr-2">Terminal Output</span>
-          {isExecuting ? (
-            <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
-          ) : (
-            <button
-              onClick={executeCode}
-              className="bg-green-600 hover:bg-green-700 text-white p-1 rounded flex items-center text-xs"
-              disabled={isExecuting}
-            >
-              <Play className="h-3 w-3 mr-1" />
-              Run
-            </button>
-          )}
+          <span className="text-sm font-medium mr-3 text-[#D1D1E0]">Terminal</span>
+          <button
+            onClick={executeCode}
+            disabled={isExecuting}
+            className="run-button text-xs bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-3 py-1.5 rounded-md flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isExecuting ? (
+              <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+            ) : (
+              <Play className="h-3 w-3 mr-1.5" />
+            )}
+            Run Code
+          </button>
         </div>
-        <button 
+        <button
           onClick={() => setIsVisible(false)}
-          className="text-gray-400 hover:text-white"
+          className="text-[#8F8FA3] hover:text-white rounded-full hover:bg-[#2A2A3A]/50 p-1"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div 
-        className="font-mono text-sm p-3 bg-black overflow-auto max-h-40"
-        style={{ whiteSpace: 'pre-wrap' }}
-      >
-        {error ? (
-          <div className="text-red-400">{error}</div>
-        ) : (
-          output || 'Terminal ready. Click Run to execute your code.'
-        )}
-      </div>
+      
+      {isVisible && (
+        <div className="terminal-scrollbar h-48 overflow-y-auto p-4 font-mono text-sm bg-[#14141B]/50 backdrop-blur-sm">
+          <div className="terminal-output whitespace-pre-wrap text-[#D1D1E0]">
+            {error ? (
+              <div className="text-red-400">{error}</div>
+            ) : (
+              output || 'Terminal ready. Run your code or type a command below.'
+            )}
+          </div>
+          
+          <form onSubmit={handleFormSubmit} className="mt-3 flex items-center bg-[#1E1E29]/70 rounded-md px-3 py-2">
+            <span className="text-[#4D5DFE] mr-2 font-bold">$</span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleInputKeyDown}
+              className="terminal-input flex-1 bg-transparent border-none outline-none text-white"
+              placeholder="Type a command..."
+            />
+            <button 
+              type="submit" 
+              className="text-[#4D5DFE] hover:text-[#3A4AE1] transition-colors p-1 hover:bg-[#2A2A3A]/50 rounded-full"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

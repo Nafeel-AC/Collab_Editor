@@ -16,6 +16,7 @@ import {
   FilePlus,
   FolderPlus
 } from 'lucide-react';
+import { showError, showSuccess, showWarning, showConfirm } from '../utils/alertUtils';
 
 // Helper to determine icon based on file extension
 const getFileIcon = (fileName) => {
@@ -52,6 +53,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
   const [newItemParent, setNewItemParent] = useState(null);
   const [renamingItem, setRenamingItem] = useState(null);
   const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
   
   const menuRef = useRef(null);
   const newItemInputRef = useRef(null);
@@ -86,59 +88,59 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
   }, [renamingItem]);
 
   // Fetch files from the server
+  const fetchFiles = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`http://localhost:3050/api/files/room/${roomId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch files');
+      }
+      
+      const data = await response.json();
+      setFiles(data.files || []);
+      
+      // Automatically expand root level
+      const expanded = {};
+      data.files.forEach(file => {
+        if (file.type === 'folder' && !file.path.includes('/')) {
+          expanded[file._id] = true;
+        }
+      });
+      setExpandedFolders(expanded);
+      
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching files:', err);
+      setError('Failed to load files');
+      setLoading(false);
+    }
+  };
+
+  // Initialize files if room is empty
+  const initializeFiles = async () => {
+    try {
+      const response = await fetch(`http://localhost:3050/api/files/initialize/${roomId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: 'Anonymous' }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to initialize files');
+      }
+      
+      await fetchFiles();
+    } catch (err) {
+      console.error('Error initializing files:', err);
+      setError('Failed to initialize files');
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchFiles = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`http://localhost:3050/api/files/room/${roomId}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch files');
-        }
-        
-        const data = await response.json();
-        setFiles(data.files || []);
-        
-        // Automatically expand root level
-        const expanded = {};
-        data.files.forEach(file => {
-          if (file.type === 'folder' && !file.path.includes('/')) {
-            expanded[file._id] = true;
-          }
-        });
-        setExpandedFolders(expanded);
-        
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching files:', err);
-        setError('Failed to load files');
-        setLoading(false);
-      }
-    };
-
-    // Initialize files if room is empty
-    const initializeFiles = async () => {
-      try {
-        const response = await fetch(`http://localhost:3050/api/files/initialize/${roomId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ username: 'Anonymous' }),
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to initialize files');
-        }
-        
-        await fetchFiles();
-      } catch (err) {
-        console.error('Error initializing files:', err);
-        setError('Failed to initialize files');
-        setLoading(false);
-      }
-    };
-
     if (roomId) {
       fetchFiles();
       
@@ -148,6 +150,9 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
       }
     }
   }, [roomId]);
+
+  // Alias for fetchFiles to make the code clearer
+  const refreshFiles = fetchFiles;
 
   // Build the file tree structure
   const buildFileTree = () => {
@@ -198,6 +203,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
     if (!newItemName.trim()) return;
     
     try {
+      setCreating(true);
       const parentPath = newItemParent ? 
         files.find(f => f._id === newItemParent)?.path : '';
       
@@ -235,6 +241,9 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
       // Add new file to the list
       setFiles(prev => [...prev, data.file]);
       
+      // Show success message
+      showSuccess(`${newItemMode === 'file' ? 'File' : 'Folder'} created successfully`);
+      
       // If it's a folder, expand it
       if (newItemMode === 'folder') {
         setExpandedFolders(prev => ({
@@ -252,6 +261,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
       setNewItemMode(null);
       setNewItemName('');
       setNewItemParent(null);
+      setCreating(false);
       
       // If parent folder exists, make sure it's expanded
       if (newItemParent) {
@@ -260,9 +270,13 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
           [newItemParent]: true
         }));
       }
+      
+      // Refresh file list
+      refreshFiles();
     } catch (err) {
       console.error('Error creating item:', err);
-      alert(`Failed to create ${newItemMode}: ${err.message}`);
+      showError(`Failed to create ${newItemMode}: ${err.message}`);
+      setCreating(false);
     }
   };
 
@@ -309,12 +323,18 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
         file._id === renamingItem ? data.file : file
       ));
       
+      // Show success message
+      showSuccess('Item renamed successfully');
+      
       // Reset rename state
       setRenamingItem(null);
       setNewName('');
+      
+      // Refresh file list
+      refreshFiles();
     } catch (err) {
       console.error('Error renaming item:', err);
-      alert(`Failed to rename: ${err.message}`);
+      showError(`Failed to rename: ${err.message}`);
     }
   };
 
@@ -330,11 +350,20 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
 
   // Delete file/folder
   const handleDelete = async (fileId) => {
-    if (!window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
-      return;
-    }
-    
     try {
+      const fileToDelete = files.find(f => f._id === fileId);
+      if (!fileToDelete) return;
+      
+      const isFolder = fileToDelete.type === 'folder';
+      const typeLabel = isFolder ? 'folder' : 'file';
+      
+      // Use our custom confirm dialog with await since it returns a Promise
+      const isConfirmed = await showConfirm(`Are you sure you want to delete this ${typeLabel}? This action cannot be undone.`);
+      
+      if (!isConfirmed) {
+        return;
+      }
+      
       const response = await fetch(`http://localhost:3050/api/files/${fileId}`, {
         method: 'DELETE',
       });
@@ -346,9 +375,15 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
       // Remove from files list
       setFiles(prev => prev.filter(file => file._id !== fileId));
       setMenuOpen(null);
+      
+      // Show success message
+      showSuccess(`${isFolder ? 'Folder' : 'File'} deleted successfully`);
+      
+      // Refresh file list
+      refreshFiles();
     } catch (err) {
       console.error('Error deleting item:', err);
-      alert(`Failed to delete: ${err.message}`);
+      showError(`Failed to delete: ${err.message}`);
     }
   };
 

@@ -1,4 +1,3 @@
-import { Server } from "socket.io";
 import {
   addParticipant,
   removeParticipant,
@@ -11,7 +10,7 @@ import { File } from "./models/file.model.js";
 import { User } from "./models/user.model.js";
 import { Message } from "./models/message.model.js";
 
-let io;
+let mainIo;
 
 // Store connected users by room
 const roomUsers = new Map();
@@ -19,17 +18,8 @@ const roomUsers = new Map();
 // Store connected users by user ID
 const connectedUsers = new Map();
 
-export const initSocketServer = (server) => {
-  io = new Server(server, {
-    cors: {
-      origin: true, // Allow all origins for testing
-      methods: ["GET", "POST"],
-      credentials: true
-    },
-    pingTimeout: 60000, // Increase ping timeout to prevent premature disconnections
-    connectTimeout: 30000,
-    maxHttpBufferSize: 1e8, // 100 MB max for large code files
-  });
+export const initSocketServer = (io) => {
+  mainIo = io; // Store the io instance
 
   // Connection middleware to log connections
   io.use(async (socket, next) => {
@@ -163,10 +153,54 @@ export const initSocketServer = (server) => {
     });
 
     // Handle code changes
-    socket.on("code-change", ({ roomId, content, sender, fileId }) => {
+    socket.on("code-update", ({ roomId, code, content, sender, fileId }) => {
+      // Use either code or content, whichever is provided
+      const codeContent = code || content;
+      
+      // Skip if we don't have the necessary data
+      if (!roomId || !codeContent) return;
+      
+      console.log(`User ${socket.id} sent code update for room ${roomId}${fileId ? ` (file ${fileId})` : ''}`);
+      
       // Broadcast to all clients in the room except the sender
+      socket.to(roomId).emit("code-update", { 
+        code: codeContent, 
+        content: codeContent, // Include both properties for compatibility
+        sender, 
+        fileId 
+      });
+      
+      // Also broadcast using the code-change event for compatibility
       socket.to(roomId).emit("code-change", { 
-        content, 
+        content: codeContent, 
+        code: codeContent, // Include both properties for compatibility
+        sender, 
+        fileId 
+      });
+    });
+
+    // Also handle code-change events for compatibility
+    socket.on("code-change", ({ roomId, code, content, sender, fileId }) => {
+      // Use either code or content, whichever is provided
+      const codeContent = code || content;
+      
+      // Skip if we don't have the necessary data
+      if (!roomId || !codeContent) return;
+      
+      console.log(`User ${socket.id} sent code change for room ${roomId}${fileId ? ` (file ${fileId})` : ''}`);
+      
+      // Broadcast to all clients in the room except the sender
+      socket.to(roomId).emit("code-update", { 
+        code: codeContent, 
+        content: codeContent, // Include both properties for compatibility
+        sender, 
+        fileId 
+      });
+      
+      // Also broadcast using the code-change event for compatibility
+      socket.to(roomId).emit("code-change", { 
+        content: codeContent, 
+        code: codeContent, // Include both properties for compatibility
         sender, 
         fileId 
       });
@@ -376,54 +410,65 @@ export const initSocketServer = (server) => {
 };
 
 export const getIO = () => {
-  if (!io) {
+  if (!mainIo) {
     throw new Error("Socket.io has not been initialized");
   }
-  return io;
+  return mainIo;
 };
 
 // Helper function to add user to a room
 const addUserToRoom = (roomId, socketId, username) => {
+  if (!roomId || !socketId) {
+    console.log(`Missing required parameters to add user to room. roomId: ${roomId}, socketId: ${socketId}`);
+    return;
+  }
+  
+  // Initialize room if it doesn't exist
   if (!roomUsers.has(roomId)) {
     roomUsers.set(roomId, []);
   }
   
-  const users = roomUsers.get(roomId);
+  // Check if user already exists in this room (handle page refreshes)
+  const room = roomUsers.get(roomId);
+  const existingUserIndex = room.findIndex(u => 
+    u.socketId === socketId || u.username === username
+  );
   
-  // First, remove any users with the same username but different socket IDs
-  // This helps prevent duplicate users when page reloads
-  const filteredUsers = users.filter(user => !(user.username === username && user.socketId !== socketId));
-  
-  // Then check if this exact socket ID already exists
-  const existingUserIndex = filteredUsers.findIndex(user => user.socketId === socketId);
-  
-  if (existingUserIndex !== -1) {
-    // Update existing user
-    filteredUsers[existingUserIndex].username = username;
+  if (existingUserIndex >= 0) {
+    // Update existing user's socket ID (useful for reconnections)
+    room[existingUserIndex] = { socketId, username };
+    console.log(`Updated user ${username} in room ${roomId}`);
   } else {
-    // Add new user
-    filteredUsers.push({ socketId, username });
+    // Add new user to room
+    room.push({ socketId, username });
+    console.log(`Added user ${username} to room ${roomId}`);
   }
   
-  // Update the room users
-  roomUsers.set(roomId, filteredUsers);
-  
-  console.log(`Room ${roomId} users updated:`, filteredUsers);
-}
+  // Broadcast updated user list
+  mainIo.to(roomId).emit('room-users', room);
+};
 
 // Helper function to remove user from a room
 const removeUserFromRoom = (roomId, socketId) => {
-  if (!roomUsers.has(roomId)) return;
-  
-  const users = roomUsers.get(roomId);
-  const updatedUsers = users.filter(user => user.socketId !== socketId);
-  
-  if (updatedUsers.length === 0) {
-    roomUsers.delete(roomId);
-  } else {
-    roomUsers.set(roomId, updatedUsers);
+  if (!roomId || !socketId || !roomUsers.has(roomId)) {
+    return;
   }
-}
+  
+  const room = roomUsers.get(roomId);
+  const newRoomUsers = room.filter(user => user.socketId !== socketId);
+  
+  if (newRoomUsers.length !== room.length) {
+    roomUsers.set(roomId, newRoomUsers);
+    
+    // If room is now empty, clean up
+    if (newRoomUsers.length === 0) {
+      roomUsers.delete(roomId);
+    } else {
+      // Notify remaining users
+      mainIo.to(roomId).emit('room-users', newRoomUsers);
+    }
+  }
+};
 
 // Helper function to get users in a room
 const getRoomUsers = (roomId) => {

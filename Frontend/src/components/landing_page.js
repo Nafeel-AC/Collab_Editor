@@ -166,7 +166,7 @@ export default function LandingPage() {
                   ) : (
                     <div className="h-10 w-10 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center shadow-md shadow-cyan-500/20">
                       <User size={20} className="text-white" />
-                    </div>
+                  </div>
                   )}
                   <span className="font-medium">{userName}</span>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />

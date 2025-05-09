@@ -5,7 +5,7 @@ import Task from '../models/task.model.js';
 const router = express.Router();
 
 // Get all tasks for logged in user
-router.get('/tasks', verifyToken, async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
     console.log('Fetching tasks for user:', req.userId);
     const tasks = await Task.find({ user: req.userId });
@@ -17,7 +17,7 @@ router.get('/tasks', verifyToken, async (req, res) => {
 });
 
 // Create new task
-router.post('/tasks', verifyToken, async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const { title, description, priority, dueDate, status } = req.body;
     
@@ -43,7 +43,7 @@ router.post('/tasks', verifyToken, async (req, res) => {
 });
 
 // Update task
-router.put('/tasks/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, priority, dueDate, status } = req.body;
@@ -79,7 +79,7 @@ router.put('/tasks/:id', verifyToken, async (req, res) => {
 });
 
 // Delete task
-router.delete('/tasks/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     

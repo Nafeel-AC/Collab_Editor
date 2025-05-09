@@ -9,6 +9,10 @@ import ChatbotPage from './components/chatbot';
 import CreateRoom from './components/CreateRoom';
 import TaskBoard from './components/TaskBoard';
 import ProfilePage from './components/ProfilePage';
+import EditorPage from './components/EditorPage';
+import ProjectsPage from './components/ProjectsPage';
+import CustomAlert from './components/ui/CustomAlert';
+import { replaceAlert } from './utils/alertUtils';
 
 import RobotAnimation from './components/RobotAnimation';
 import './App.css';
@@ -27,8 +31,20 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  // Replace default alert with custom alert
+  useEffect(() => {
+    // Replace the default alert function
+    const restoreAlert = replaceAlert();
+    
+    // Restore the original alert function when the component unmounts
+    return () => {
+      restoreAlert();
+    };
+  }, []);
+
   return (
     <Router>
+      <CustomAlert />
       <Routes>
         {/* Public routes */}
         <Route exact path="/" element={<LandingPage />} />
@@ -59,9 +75,19 @@ function App() {
             <CreateRoom />
           </ProtectedRoute>
         } />
+        <Route path="/editor/:roomId" element={
+          <ProtectedRoute>
+            <EditorPage />
+          </ProtectedRoute>
+        } />
         <Route path="/tasks" element={
           <ProtectedRoute>
             <TaskBoard />
+          </ProtectedRoute>
+        } />
+        <Route path="/projects" element={
+          <ProtectedRoute>
+            <ProjectsPage />
           </ProtectedRoute>
         } />
         
