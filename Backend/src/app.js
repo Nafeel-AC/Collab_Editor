@@ -9,7 +9,7 @@ const app = express();
 app.use(cors({
   origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173'], // Allow specific origins for better security
   credentials: true, // Allow cookies to be sent
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
@@ -41,6 +41,7 @@ import { router as messageRouter } from "./routes/message.route.js";
 import snippetRouter from "./routes/snippet.route.js";
 import taskRouter from "./routes/task.route.js";
 import projectRouter from "./routes/project.route.js";
+import { chatRouter } from "./routes/chat.route.js";
 
 app.use("/api/users", userRouter);
 app.use("/api/rooms", roomRouter);
@@ -50,5 +51,6 @@ app.use("/api/messages", messageRouter);
 app.use("/api/snippets", snippetRouter);
 app.use("/api/tasks", taskRouter);
 app.use("/api/projects", projectRouter);
+app.use("/api/chat", chatRouter);
 
 export { app };

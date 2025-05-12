@@ -105,8 +105,17 @@ export default function ChatbotPage() {
   const [activeConversation, setActiveConversation] = useState("")
   const [isNamingChat, setIsNamingChat] = useState(false)
   const [newChatName, setNewChatName] = useState("")
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false)
   const chatContainerRef = useRef(null)
   const textareaRef = useRef(null)
+
+  // Load theme from local storage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("chatbotTheme");
+    if (savedTheme) {
+      setIsDarkMode(savedTheme === "dark");
+    }
+  }, []);
 
   // Apply the custom dark theme style on component mount
   useEffect(() => {
@@ -136,44 +145,220 @@ export default function ChatbotPage() {
     }
   }, [chatHistory, isLoading])
 
-  // Load conversations from local storage
+  // Load conversations from the backend when authenticated
   useEffect(() => {
-    const savedConversations = localStorage.getItem("conversations")
-    if (savedConversations) {
-      setConversations(JSON.parse(savedConversations))
+    const loadConversationsFromServer = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          console.log("No authentication token found, loading from localStorage");
+          
+          // For guests, load conversations from local storage
+          const savedConversations = localStorage.getItem("conversations");
+          if (savedConversations) {
+            try {
+              const parsed = JSON.parse(savedConversations);
+              // Ensure each conversation has a messages array
+              const validConversations = parsed.map(conv => ({
+                ...conv,
+                messages: Array.isArray(conv.messages) ? conv.messages : []
+              }));
+              setConversations(validConversations);
+              
+              // Load active conversation if it exists
+              const savedActiveConversation = localStorage.getItem("activeConversation");
+              if (savedActiveConversation) {
+                setActiveConversation(savedActiveConversation);
+                const activeChat = validConversations.find(
+                  (conv) => conv._id === savedActiveConversation
+                );
+                if (activeChat) {
+                  setChatHistory(Array.isArray(activeChat.messages) ? activeChat.messages : []);
+                }
+              } else if (validConversations.length > 0) {
+                // If no active conversation is set but we have conversations, select the first one
+                setActiveConversation(validConversations[0]._id);
+                setChatHistory(Array.isArray(validConversations[0].messages) ? validConversations[0].messages : []);
+              } else {
+                // If no conversations exist, create a new one
+                createNewChat();
+              }
+            } catch (e) {
+              console.error("Error parsing saved conversations:", e);
+              setConversations([]);
+              createNewChat();
+            }
+          } else {
+            // No saved conversations, create a new one
+            createNewChat();
+          }
+          return;
+        }
+        
+        console.log("Fetching conversations from server with token");
+        
+        // First, get list of conversations (without messages)
+        const response = await fetch("http://localhost:3050/api/chat/conversations", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Loaded conversation list:", data);
+          
+          if (!Array.isArray(data) || data.length === 0) {
+            console.log("No conversations returned from server, creating new chat");
+            createNewChat();
+            return;
+          }
+          
+          // Initialize conversations with empty message arrays to prevent issues
+          // when switching between them before loading their content
+          const initialConversations = data.map(conv => ({
+            ...conv,
+            messages: [] // Initialize with empty array, will be populated when selected
+          }));
+          
+          setConversations(initialConversations);
+          
+          // Check if we have a saved active conversation
+          const savedActiveConversation = localStorage.getItem("activeConversation");
+          const conversationToLoad = savedActiveConversation && 
+                                    initialConversations.some(c => c._id === savedActiveConversation) 
+                                    ? savedActiveConversation 
+                                    : initialConversations[0]._id;
+          
+          // Set active conversation ID first
+          setActiveConversation(conversationToLoad);
+          
+          // Then fetch the full conversation with messages
+          await loadConversation(conversationToLoad);
+        } else {
+          // Log the error response
+          const errorText = await response.text();
+          console.error("Error loading conversations:", response.status, errorText);
+          // Fall back to local storage
+          const savedConversations = localStorage.getItem("conversations");
+          if (savedConversations) {
+            try {
+              setConversations(JSON.parse(savedConversations));
+            } catch (e) {
+              console.error("Error parsing saved conversations:", e);
+              createNewChat();
+            }
+          } else {
+            createNewChat();
+          }
+        }
+      } catch (error) {
+        console.error("Error loading conversations:", error);
+        createNewChat();
+      }
+    };
+    
+    loadConversationsFromServer();
+  }, []);
+  
+  // Function to load a specific conversation with messages
+  const loadConversation = async (conversationId) => {
+    try {
+      setIsLoadingConversation(true);
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.log("No token found, can't load conversation from server");
+        // For non-authenticated users, just load from local conversations
+        const localConversation = conversations.find(conv => conv._id === conversationId);
+        if (localConversation) {
+          setChatHistory(Array.isArray(localConversation.messages) ? localConversation.messages : []);
+        } else {
+          setChatHistory([]);
+        }
+        setIsLoadingConversation(false);
+        return;
+      }
+      
+      console.log(`Loading conversation ${conversationId} from server`);
+      
+      const response = await fetch(`http://localhost:3050/api/chat/conversations/${conversationId}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const conversation = await response.json();
+        console.log("Loaded full conversation:", conversation);
+        
+        if (!conversation || typeof conversation !== 'object') {
+          console.error("Received invalid conversation data:", conversation);
+          setChatHistory([]);
+          setIsLoadingConversation(false);
+          return;
+        }
+        
+        // Update the active conversation ID
+        setActiveConversation(conversation._id || conversationId);
+        
+        // Ensure messages is an array before setting it
+        const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+        setChatHistory(messages);
+        
+        // Also update this conversation in the conversations array to keep them in sync
+        setConversations(prevConversations => 
+          prevConversations.map(conv => {
+            if (conv._id === conversationId) {
+              return {
+                ...conv,
+                messages: messages,
+                title: conversation.title || conv.title
+              };
+            }
+            return conv;
+          })
+        );
+      } else {
+        // Log the error response
+        const errorText = await response.text();
+        console.error(`Error loading conversation ${conversationId}:`, response.status, errorText);
+        setChatHistory([]);
+      }
+    } catch (error) {
+      console.error("Error loading conversation:", error);
+      // Set empty chat history in case of error
+      setChatHistory([]);
+    } finally {
+      setIsLoadingConversation(false);
     }
-
-    const savedActiveConversation = localStorage.getItem("activeConversation")
-    if (savedActiveConversation) {
-      setActiveConversation(savedActiveConversation)
-      const activeChat = JSON.parse(savedConversations).find(
-        (conv) => conv.id === savedActiveConversation,
-      )
-      if (activeChat) {
-        setChatHistory(activeChat.messages)
+  };
+  
+  // Save conversations to local storage for non-authenticated users
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token && conversations.length > 0) {
+      console.log("Saving conversations to localStorage:", conversations.length, "conversations");
+      try {
+        localStorage.setItem("conversations", JSON.stringify(conversations));
+      } catch (error) {
+        console.error("Error saving conversations to localStorage:", error);
       }
     }
-
-    const savedTheme = localStorage.getItem("chatbotTheme")
-    if (savedTheme) {
-      setIsDarkMode(savedTheme === "dark")
-    }
-  }, [])
-
-  // Save conversations to local storage
-  useEffect(() => {
-    localStorage.setItem("conversations", JSON.stringify(conversations))
-  }, [conversations])
-
-  // Save active conversation to local storage
-  useEffect(() => {
-    localStorage.setItem("activeConversation", activeConversation)
-  }, [activeConversation])
+  }, [conversations]);
 
   // Save theme to local storage
   useEffect(() => {
     localStorage.setItem("chatbotTheme", isDarkMode ? "dark" : "light")
   }, [isDarkMode])
+  
+  // Save active conversation to local storage
+  useEffect(() => {
+    if (activeConversation) {
+      localStorage.setItem("activeConversation", activeConversation);
+      console.log("Saved active conversation to localStorage:", activeConversation);
+    }
+  }, [activeConversation]);
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode)
@@ -194,34 +379,145 @@ export default function ChatbotPage() {
   }
 
   const createNewChat = () => {
-    const newChatId = uuidv4()
-    const newChat = {
-      id: newChatId,
-      title: "New Chat",
-      messages: [],
+    // First, try to create a conversation on the server if user is authenticated
+    const token = localStorage.getItem("token");
+    
+    if (token) {
+      console.log("Creating new conversation on server");
+      // Create conversation on the server
+      fetch("http://localhost:3050/api/chat/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: "New Chat"
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log("Server created conversation:", data);
+        
+        // Verify the data has the expected structure
+        if (!data || !data._id) {
+          console.error("Invalid response when creating conversation:", data);
+          createLocalChat(); // Fall back to local
+          return;
+        }
+        
+        // Add the server-created conversation to our local state
+        setConversations(prevConversations => [...prevConversations, {
+          ...data,
+          messages: Array.isArray(data.messages) ? data.messages : [] // Ensure messages is an array
+        }]);
+        setActiveConversation(data._id);
+        setChatHistory([]);
+      })
+      .catch(error => {
+        console.error("Error creating conversation on server:", error);
+        // Fall back to local-only creation
+        createLocalChat();
+      });
+    } else {
+      console.log("Creating local-only conversation");
+      // If not authenticated, create local-only chat
+      createLocalChat();
     }
+  };
+  
+  // Local-only chat creation (fallback)
+  const createLocalChat = () => {
+    try {
+      const newChatId = uuidv4();
+      console.log("Generated new chat ID:", newChatId);
+      
+      const newChat = {
+        _id: newChatId,
+        title: "New Chat",
+        messages: [], // Ensure this is an array
+      };
 
-    setConversations((prevConversations) => [...prevConversations, newChat])
-    setActiveConversation(newChatId)
-    setChatHistory([])
-    setIsNamingChat(true)
-    setNewChatName("")
-    setIsMenuOpen(false)
-  }
+      console.log("Creating new local chat:", newChat);
+      setConversations(prevConversations => [...prevConversations, newChat]);
+      setActiveConversation(newChatId);
+      setChatHistory([]);
+      setIsNamingChat(true);
+      setNewChatName("");
+      setIsMenuOpen(false);
+    } catch (error) {
+      console.error("Error creating local chat:", error);
+      // Create a simple fallback in case of error
+      const fallbackId = String(Date.now());
+      const fallbackChat = {
+        _id: fallbackId,
+        title: "New Chat",
+        messages: [],
+      };
+      setConversations(prevConversations => [...prevConversations, fallbackChat]);
+      setActiveConversation(fallbackId);
+      setChatHistory([]);
+    }
+  };
 
   const saveChatName = () => {
     if (newChatName.trim()) {
-      setConversations((prevConversations) =>
-        prevConversations.map((conv) => {
-          if (conv.id === activeConversation) {
+      // Update name locally
+      setConversations(prevConversations =>
+        prevConversations.map(conv => {
+          if (conv._id === activeConversation) {
             return { ...conv, title: newChatName.trim() }
           }
           return conv
-        }),
-      )
+        })
+      );
+      
+      // Update name on server if user is authenticated
+      const token = localStorage.getItem("token");
+      if (token) {
+        const updateTitle = async () => {
+          try {
+            // First try with PATCH
+            const response = await fetch(`http://localhost:3050/api/chat/conversations/${activeConversation}/title`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({ title: newChatName.trim() })
+            });
+            
+            if (!response.ok) {
+              console.log("PATCH failed, trying PUT method instead");
+              // If PATCH fails, try PUT
+              const putResponse = await fetch(`http://localhost:3050/api/chat/conversations/${activeConversation}/title`, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ title: newChatName.trim() })
+              });
+              
+              if (!putResponse.ok) {
+                console.error("Error updating conversation title with PUT:", await putResponse.text());
+              }
+            }
+          } catch (error) {
+            console.error("Error updating conversation title:", error);
+          }
+        };
+        
+        updateTitle();
+      }
     }
-    setIsNamingChat(false)
-  }
+    setIsNamingChat(false);
+  };
 
   const handleNameKeyPress = (e) => {
     if (e.key === "Enter") {
@@ -230,25 +526,92 @@ export default function ChatbotPage() {
     }
   }
 
-  const switchConversation = (id) => {
-    setActiveConversation(id)
-    const selectedChat = conversations.find((conv) => conv.id === id)
-    if (selectedChat) {
-      setChatHistory(selectedChat.messages)
+  const switchConversation = async (id) => {
+    setActiveConversation(id);
+    console.log(`Switching to conversation: ${id}`);
+    setIsLoadingConversation(true);
+    
+    const token = localStorage.getItem("token");
+    
+    // For authenticated users, load conversation from the server
+    if (token) {
+      try {
+        console.log(`Loading conversation ${id} from server`);
+        
+        const response = await fetch(`http://localhost:3050/api/chat/conversations/${id}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const conversation = await response.json();
+          console.log("Loaded conversation from server:", conversation);
+          
+          if (!conversation || typeof conversation !== 'object') {
+            console.error("Received invalid conversation data:", conversation);
+            setChatHistory([]);
+            setIsLoadingConversation(false);
+            return;
+          }
+          
+          // Ensure messages is an array before setting it
+          setChatHistory(Array.isArray(conversation.messages) ? conversation.messages : []);
+        } else {
+          // Log the error response
+          const errorText = await response.text();
+          console.error(`Error loading conversation ${id}:`, response.status, errorText);
+          setChatHistory([]);
+        }
+      } catch (error) {
+        console.error("Error loading conversation:", error);
+        setChatHistory([]);
+      } finally {
+        setIsLoadingConversation(false);
+      }
+    } else {
+      // For non-authenticated users, load from local state
+      console.log(`Loading conversation ${id} from local state`);
+      const selectedChat = conversations.find((conv) => conv._id === id);
+      
+      if (selectedChat) {
+        console.log("Found conversation in local state:", selectedChat);
+        // Make sure messages is an array before setting it
+        setChatHistory(Array.isArray(selectedChat.messages) ? selectedChat.messages : []);
+      } else {
+        console.warn(`Conversation ${id} not found in local state`);
+        setChatHistory([]);
+      }
+      setIsLoadingConversation(false);
     }
-    setIsMenuOpen(false)
-  }
+    
+    setIsMenuOpen(false);
+  };
 
   const deleteConversation = (id, e) => {
-    e.stopPropagation()
-    setConversations((prevConversations) => 
-      prevConversations.filter((conv) => conv.id !== id)
-    )
+    e.stopPropagation();
+    
+    // Delete from server if user is authenticated
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetch(`http://localhost:3050/api/chat/conversations/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      .catch(error => console.error("Error deleting conversation:", error));
+    }
+    
+    // Delete locally
+    setConversations(prevConversations => 
+      prevConversations.filter(conv => conv._id !== id)
+    );
 
     if (activeConversation === id) {
-      createNewChat()
+      createNewChat();
     }
-  }
+  };
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -273,13 +636,14 @@ export default function ChatbotPage() {
     const updatedChatHistory = [...chatHistory, userMessage]
     setChatHistory(updatedChatHistory)
 
-    // Update conversations with user message
-    setConversations((prevConversations) =>
-      prevConversations.map((conv) => {
-        if (conv.id === activeConversation) {
-          return { ...conv, messages: [...conv.messages, userMessage] }
+    // Update conversations with user message - ensuring messages is an array
+    setConversations(prevConversations =>
+      prevConversations.map(conv => {
+        if (conv._id === activeConversation) {
+          const messages = Array.isArray(conv.messages) ? [...conv.messages, userMessage] : [userMessage];
+          return { ...conv, messages };
         }
-        return conv
+        return conv;
       }),
     )
 
@@ -288,18 +652,28 @@ export default function ChatbotPage() {
     setIsLoading(true)
 
     try {
-      const combinedMessages = updatedChatHistory.map((msg) => ({
+      // Format messages for Gemini API - add safety check
+      const combinedMessages = updatedChatHistory.map(msg => ({
         role: msg.sender === "user" ? "user" : "assistant",
         parts: [{ text: msg.text }],
-      }))
+      }));
 
-      // Make API call to Gemini API
+      const token = localStorage.getItem("token");
+      
+      console.log(`Sending message to chat API with${token ? '' : 'out'} authentication`);
+      console.log("Using conversation ID:", activeConversation);
+      
+      // Make API call to chat API
       const response = await fetch("http://localhost:3050/api/chat", {
-          method: "POST",
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": token ? `Bearer ${token}` : ''
         },
-        body: JSON.stringify({ messages: combinedMessages }),
+        body: JSON.stringify({ 
+          messages: combinedMessages,
+          conversationId: activeConversation // Send the conversation ID for persistence
+        }),
       })
 
       const data = await response.json()
@@ -308,16 +682,46 @@ export default function ChatbotPage() {
         throw new Error(data.message || "Error communicating with API")
       }
       
-      if (!data.candidates || data.candidates.length === 0) {
-        throw new Error("Empty response from API")
+      // Log persistence metadata if available
+      if (data._meta) {
+        console.log("Message persistence status:", data._meta);
+        if (!data._meta.saved) {
+          console.warn("Messages were not saved to database:", data._meta.reason);
+        }
       }
       
-      if (!data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
-        return
+      // Add more robust checks for the response data structure
+      if (!data || !data.candidates) {
+        console.error("Invalid or empty response from API:", data);
+        throw new Error("Invalid response from API");
       }
-
+      
+      if (data.candidates.length === 0) {
+        console.error("Empty candidates array from API:", data);
+        throw new Error("Empty response from API");
+      }
+      
+      const candidate = data.candidates[0];
+      if (!candidate || !candidate.content) {
+        console.error("Invalid candidate structure:", candidate);
+        throw new Error("Invalid response structure from API");
+      }
+      
+      const parts = candidate.content.parts;
+      if (!Array.isArray(parts) || parts.length === 0) {
+        console.error("Invalid or empty parts array:", candidate.content);
+        throw new Error("Invalid response parts from API");
+      }
+      
+      // Extract the response text from Gemini API response
+      const rawResponse = parts[0].text;
+      
+      if (typeof rawResponse !== 'string') {
+        console.error("Missing or invalid text in response:", parts[0]);
+        throw new Error("Missing text in API response");
+      }
+      
       // Clean and format the response
-      const rawResponse = data.candidates[0].content.parts[0].text
       const formattedResponse = rawResponse
         .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Convert **bold** to <strong>
         .replace(/\*(.*?)\*/g, "<em>$1</em>") // Convert *italic* to <em>
@@ -334,30 +738,106 @@ export default function ChatbotPage() {
       }
 
       // Add bot message to chat history
-      setChatHistory((prevHistory) => [...prevHistory, botMessage])
+      setChatHistory(prevHistory => [...prevHistory, botMessage])
 
       // Update conversations with bot message
-      setConversations((prevConversations) =>
-        prevConversations.map((conv) => {
-          if (conv.id === activeConversation) {
-            return { ...conv, messages: [...conv.messages, botMessage] }
+      setConversations(prevConversations =>
+        prevConversations.map(conv => {
+          if (conv._id === activeConversation) {
+            const messages = Array.isArray(conv.messages) ? [...conv.messages, botMessage] : [botMessage];
+            return { ...conv, messages };
           }
-          return conv
+          return conv;
         }),
       )
+      
+      // Make sure we save conversations to localStorage for non-authenticated users
+      if (!token) {
+        const updatedConversations = conversations.map(conv => {
+          if (conv._id === activeConversation) {
+            const messages = Array.isArray(conv.messages) ? [...conv.messages, userMessage, botMessage] : [userMessage, botMessage];
+            return { ...conv, messages };
+          }
+          return conv;
+        });
+        localStorage.setItem("conversations", JSON.stringify(updatedConversations));
+        console.log("Saved conversations to localStorage for non-authenticated user");
+      }
+      
+      // If this is a new chat with no title, set a title based on the first message
+      const currentConversation = conversations.find(conv => conv._id === activeConversation);
+      if (currentConversation && 
+          currentConversation.title === "New Chat" && 
+          Array.isArray(currentConversation.messages) && 
+          currentConversation.messages.length <= 1) {
+        // Create a title from the first message (max 30 chars)
+        const autoTitle = trimmedInput.length > 30 
+          ? trimmedInput.substring(0, 30) + "..." 
+          : trimmedInput;
+          
+        // Update title locally
+        setConversations(prevConversations =>
+          prevConversations.map(conv => {
+            if (conv._id === activeConversation) {
+              return { ...conv, title: autoTitle }
+            }
+            return conv
+          })
+        );
+        
+        // Update on server if user is authenticated
+        const token = localStorage.getItem("token");
+        if (token) {
+          const updateTitle = async () => {
+            try {
+              // First try with PATCH
+              const response = await fetch(`http://localhost:3050/api/chat/conversations/${activeConversation}/title`, {
+                method: "PATCH",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ title: autoTitle })
+              });
+              
+              if (!response.ok) {
+                console.log("PATCH failed for auto-title, trying PUT method instead");
+                // If PATCH fails, try PUT
+                const putResponse = await fetch(`http://localhost:3050/api/chat/conversations/${activeConversation}/title`, {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ title: autoTitle })
+                });
+                
+                if (!putResponse.ok) {
+                  console.error("Error updating auto-title with PUT:", await putResponse.text());
+                }
+              }
+            } catch (error) {
+              console.error("Error updating auto-title:", error);
+            }
+          };
+          
+          updateTitle();
+        }
+      }
     } catch (error) {
       console.error("Error communicating with API:", error)
       const errorMessage = {
         sender: "bot",
         text: "Error communicating with API. Please check your connection and try again.",
       }
-      setChatHistory((prevHistory) => [...prevHistory, errorMessage])
-      setConversations((prevConversations) =>
-        prevConversations.map((conv) => {
-          if (conv.id === activeConversation) {
-            return { ...conv, messages: [...conv.messages, errorMessage] }
+      setChatHistory(prevHistory => [...prevHistory, errorMessage])
+      setConversations(prevConversations =>
+        prevConversations.map(conv => {
+          if (conv._id === activeConversation) {
+            const messages = Array.isArray(conv.messages) ? [...conv.messages, errorMessage] : [errorMessage];
+            return { ...conv, messages };
           }
-          return conv
+          return conv;
         }),
       )
     } finally {
@@ -439,11 +919,11 @@ export default function ChatbotPage() {
                 <h2 className="px-2 text-sm font-medium uppercase text-[#8F8FA3] mb-2">Recent Conversations</h2>
                 {conversations.map((conv) => (
                   <motion.div
-                    key={conv.id}
+                    key={conv._id}
                     whileHover={{ scale: 1.02, x: 4 }}
-                    onClick={() => switchConversation(conv.id)}
+                    onClick={() => switchConversation(conv._id)}
                     className={`flex items-center justify-between p-3 mb-1 rounded-lg cursor-pointer group ${
-                      activeConversation === conv.id
+                      activeConversation === conv._id
                         ? "bg-[#2A2A3A]/70 text-white border border-[#2A2A3A] card-glow"
                         : "hover:bg-[#1E1E29]/60 text-[#D1D1E0]"
                     } transition-all duration-200`}
@@ -457,7 +937,7 @@ export default function ChatbotPage() {
                     <motion.button
                       whileHover={{ scale: 1.2 }}
                       whileTap={{ scale: 0.8 }}
-                      onClick={(e) => deleteConversation(conv.id, e)}
+                      onClick={(e) => deleteConversation(conv._id, e)}
                       className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-[#363636] text-[#8F8FA3] hover:text-white transition-opacity"
                     >
                       <Trash size={14} />
@@ -498,7 +978,7 @@ export default function ChatbotPage() {
             </motion.button>
             
             <h2 className="font-medium truncate text-[#D1D1E0]">
-              {conversations.find((conv) => conv.id === activeConversation)?.title || "New Chat"}
+              {conversations.find((conv) => conv._id === activeConversation)?.title || "New Chat"}
             </h2>
           </div>
 
@@ -521,8 +1001,8 @@ export default function ChatbotPage() {
           }}
         >
           <div className="max-w-3xl mx-auto space-y-6">
-            {/* Welcome message if no messages */}
-            {chatHistory.length === 0 && (
+            {/* Welcome message if no messages and not currently loading */}
+            {chatHistory.length === 0 && !isLoading && !isLoadingConversation && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -550,11 +1030,26 @@ export default function ChatbotPage() {
               </motion.div>
             )}
 
+            {/* Loading conversation indicator */}
+            {isLoadingConversation && chatHistory.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center p-8 rounded-xl bg-[#14141B]/80 border border-[#2A2A3A] shadow-lg backdrop-blur-sm"
+              >
+                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-[#4D5DFE]/20 to-[#3A4AE1]/20 border border-[#4D5DFE]/30">
+                  <div className="w-10 h-10 rounded-full border-4 border-[#4D5DFE]/30 border-t-[#4D5DFE] animate-spin"></div>
+                </div>
+                <h3 className="text-lg font-bold mb-2 text-white">Loading Conversation</h3>
+                <p className="text-[#8F8FA3]">Retrieving your chat history...</p>
+              </motion.div>
+            )}
+
             {/* Chat messages */}
             <AnimatePresence>
               {chatHistory.map((message, index) => (
                 <motion.div
-                  key={index}
+                  key={`${activeConversation}-${index}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 > 0.5 ? 0.5 : index * 0.1 }}
@@ -575,7 +1070,7 @@ export default function ChatbotPage() {
               ))}
             </AnimatePresence>
 
-            {/* Loading indicator */}
+            {/* Loading indicator for chat replies */}
             {isLoading && (
               <motion.div
                 initial={{ opacity: 0 }}
