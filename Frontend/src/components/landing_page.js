@@ -1,493 +1,90 @@
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { Link, useNavigate } from "react-router-dom";
-import React, { useState, useEffect } from "react";
-import GradientText from "./gradient_text";
-import { CarouselDemo } from "./CarouselDemo";
-import { MacbookDemo } from "./MacbookDemo";
-import { Footer } from "./Footer";
-import { LogOut, User, ChevronDown } from "lucide-react";
-import { TypewriterEffectSmooth } from "./TypewriterEffect";
-import axios from "axios";
+import React from "react";
+import Footer from "./Footer";
 
-export default function LandingPage() {
-  const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userName, setUserName] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [userProfile, setUserProfile] = useState(null);
+const features = [
+  {
+    title: "Real-Time Collaboration",
+    desc: "Work together with your team instantly. See changes as they happen, no refresh needed.",
+    icon: (
+      <svg className="w-10 h-10 text-cyan-400 mb-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m9-4.13a4 4 0 1 0-8 0 4 4 0 0 0 8 0zm6 4v2a4 4 0 0 1-3 3.87M3 16v2a4 4 0 0 0 3 3.87" />
+      </svg>
+    ),
+  },
+  {
+    title: "Live Chat",
+    desc: "Communicate with your team without leaving the editor. Stay connected and productive.",
+    icon: (
+      <svg className="w-10 h-10 text-cyan-400 mb-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Version Control",
+    desc: "Track changes, revert to previous versions, and never lose your progress.",
+    icon: (
+      <svg className="w-10 h-10 text-cyan-400 mb-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 9l5-5 5 5M12 4.998v12.002" />
+      </svg>
+    ),
+  },
+];
 
-  // Check if user is logged in
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const storedUserName = localStorage.getItem("userName");
-    
-    if (token) {
-      setIsAuthenticated(true);
-      setUserName(storedUserName || "User");
-      
-      // Fetch user profile data to get the profile picture
-      const fetchUserProfile = async () => {
-        try {
-          const response = await axios.get(`http://localhost:3050/api/users/me`, {
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
-            withCredentials: true
-          });
-          
-          // Process profile picture URL
-          let profileData = response.data;
-          if (profileData.profilePic && !profileData.profilePic.startsWith('http')) {
-            profileData.profilePic = `http://localhost:3050${profileData.profilePic}`;
-          }
-          
-          setUserProfile(profileData);
-          console.log("Loaded user profile:", profileData);
-        } catch (err) {
-          console.error('Error fetching user profile for landing page:', err);
-        }
-      };
-      
-      fetchUserProfile();
-    }
-  }, []);
+const LandingPage = () => (
+  <div className="min-h-screen bg-gradient-to-br from-[#0f2027] via-[#2c5364] to-[#232526] flex flex-col">
+    {/* Hero Section */}
+    <header className="flex-1 flex flex-col items-center justify-center text-center px-4 py-20">
+      <h1 className="text-5xl md:text-6xl font-extrabold text-cyan-400 mb-4 futuristic-font drop-shadow-lg">
+        Experience Collaborative Editing
+      </h1>
+      <p className="text-lg md:text-2xl text-cyan-100 mb-8 max-w-2xl mx-auto opacity-90">
+        Empower your team to code, write, and create together in real time. Fast, secure, and beautifully futuristic.
+      </p>
+      <a
+        href="/signup"
+        className="inline-block px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-white text-lg font-semibold rounded-full shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-cyan-400/40"
+      >
+        Get Started Free
+      </a>
+    </header>
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userId");
-    setIsAuthenticated(false);
-    setShowDropdown(false);
-    
-    // Force reload to ensure all components update
-    window.location.reload();
-  };
-
-  return (
-    <div
-      className="winking-rough"
-      style={{ fontFamily: "'Winking Rough', sans-serif" }}
-    >
-      <header className="py-4 bg-black sm:py-6">
-        <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="shrink-0">
-              <a
-                href="#"
-                title=""
-                className="flex text-4xl font-bold text-gray-400"
-              >
-                CodeSync
-              </a>
-            </div>
-
-            <div className="flex md:hidden">
-              <button type="button" className="text-white">
-                <span aria-hidden="true">
-                  <svg
-                    className="w-7 h-7"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.5"
-                      d="M4 6h16M4 12h16M4 18h16"
-                    />
-                  </svg>
-                </span>
-              </button>
-            </div>
-
-            <nav className="hidden ml-10 mr-auto space-x-10 lg:ml-20 lg:space-x-12 md:flex md:items-center md:justify-start">
-              <Link
-                to="/robot-animation"
-                className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
-              >
-                ChatBot
-              </Link>
-
-              {isAuthenticated && (
-                <Link
-                  to="/tasks"
-                  className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
-                >
-                  Tasks
-                </Link>
-              )}
-
-              {isAuthenticated && (
-                <Link
-                  to="/Dashboard"
-                  className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
-                >
-                  Dashboard
-                </Link>
-              )}
-
-              <Link
-                to="/Support"
-                className="text-base font-bold text-gray-400 transition-all duration-200 hover:text-white"
-              >
-                Support
-              </Link>
-            </nav>
-
-            {!isAuthenticated ? (
-              <div className="relative hidden md:items-center md:justify-center md:inline-flex group">
-                <div className="absolute transition-all duration-200 rounded-full -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 group-hover:shadow-lg group-hover:shadow-cyan-500/50"></div>
-                <Link
-                  to="/LoginPage"
-                  className="relative inline-flex items-center justify-center px-6 py-2 text-base font-bold text-gray-400 bg-black border border-transparent rounded-full"
-                >
-                  Login
-                </Link>
-              </div>
-            ) : (
-              <div className="relative hidden md:flex items-center">
-                <button 
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="flex items-center space-x-2 text-gray-400 hover:text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-all duration-200"
-                >
-                  {userProfile?.profilePic ? (
-                    <img 
-                      src={userProfile.profilePic} 
-                      alt={userName}
-                      className="h-10 w-10 rounded-full object-cover border-2 border-cyan-500 shadow-md shadow-cyan-500/20"
-                      onError={(e) => {
-                        console.error("Error loading profile image:", e);
-                        e.target.onerror = null;
-                        e.target.src = `https://ui-avatars.com/api/?name=${userName || 'User'}&background=random`;
-                      }}
-                    />
-                  ) : (
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center shadow-md shadow-cyan-500/20">
-                      <User size={20} className="text-white" />
-                  </div>
-                  )}
-                  <span className="font-medium">{userName}</span>
-                  <ChevronDown size={16} className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
-                </button>
-
-                {showDropdown && (
-                  <div className="absolute top-full mt-1 right-0 bg-gray-900 border border-gray-700 rounded-md shadow-lg w-48 py-1 z-50">
-                    <button
-                      onClick={() => {
-                        navigate('/ProfilePage');
-                        setShowDropdown(false);
-                      }}
-                      className="w-full text-left block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
-                    >
-                      My Profile
-                    </button>
-                    <Link
-                      to="/Dashboard"
-                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      to="/tasks"
-                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
-                    >
-                      My Tasks
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white flex items-center"
-                    >
-                      <LogOut size={14} className="mr-2" /> Sign Out
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+    {/* Features Section */}
+    <section className="max-w-5xl mx-auto px-4 py-12">
+      <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 text-center futuristic-font">
+        Features
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {features.map((feature, idx) => (
+          <div
+            key={idx}
+            className="bg-[#1a2a36] rounded-2xl p-8 shadow-xl border border-[#2c5364] transition-all duration-300
+              hover:scale-105 hover:shadow-cyan-400/40 hover:border-cyan-400 hover:bg-[#232526] cursor-pointer group"
+          >
+            <div>{feature.icon}</div>
+            <h3 className="text-xl font-bold text-cyan-300 mb-2 group-hover:text-white transition">{feature.title}</h3>
+            <p className="text-cyan-100 group-hover:text-cyan-200 transition">{feature.desc}</p>
           </div>
-        </div>
-      </header>
+        ))}
+      </div>
+    </section>
 
-      <section className="relative py-12 overflow-hidden bg-black sm:pb-16 lg:pb-20 xl:pb-24">
-        <div className="px-4 mx-auto relative sm:px-6 lg:px-8 max-w-7xl">
-          <div className="grid items-center grid-cols-1 gap-y-12 lg:grid-cols-2 gap-x-16">
-            <div>
-              <TypewriterEffectSmooth
-                words={[
-                  {
-                    text: "Collaborative",
-                    className: "text-transparent bg-clip-text font-bold text-gray-400"
-                  },
-                  {
-                    text: "Code",
-                    className: "text-transparent bg-clip-text font-bold text-gray-400"
-                  },
-                  {
-                    text: "Editor",
-                    className: "text-transparent bg-clip-text font-bold text-gray-400"
-                  }
-                ]}
-                className="font-playfair italic text-4xl font-bold sm:text-5xl lg:text-6xl xl:text-7xl"
-              />
-              <p className="mt-4 font-playfair italic text-lg font-normal text-gray-400 sm:mt-8">
-                Build your projects with your team in real-time. Share your
-                code, collaborate and get instant feedback.
-              </p>
+    {/* Call to Action */}
+    <section className="text-center py-12">
+      <h3 className="text-2xl md:text-3xl font-semibold text-cyan-200 mb-4">
+        Ready to boost your productivity?
+      </h3>
+      <a
+        href="/signup"
+        className="inline-block px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-white text-lg font-semibold rounded-full shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-cyan-400/40"
+      >
+        Start Collaborating Now
+      </a>
+    </section>
 
-              <form
-                action="#"
-                method="POST"
-                className="relative mt-8 rounded-full sm:mt-12"
-              >
-                <div className="relative">
-                  <div className="absolute rounded-full -inset-px bg-gradient-to-r from-cyan-500 to-purple-500"></div>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-6">
-                      <svg
-                        className="w-5 h-5 text-gray-500"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        />
-                      </svg>
-                    </div>
-                    <input
-                      type="email"
-                      name=""
-                      id=""
-                      placeholder="Try Java Developer, React Dev etc."
-                      className="block w-full py-4 pr-6 text-white placeholder-gray-500 bg-black border border-transparent rounded-full pl-14 sm:py-5 focus:border-transparent focus:ring-0"
-                    />
-                  </div>
-                </div>
-                <div className="sm:absolute flex sm:right-1.5 sm:inset-y-1.5 mt-4 sm:mt-0">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center w-full px-5 py-5 text-sm font-semibold tracking-widest text-black uppercase transition-all duration-200 bg-white rounded-full sm:w-auto sm:py-3 hover:opacity-90"
-                  >
-                    Find A Developer
-                  </button>
-                </div>
-              </form>
+    {/* Footer */}
+    <Footer />
+  </div>
+);
 
-              <div className="mt-8 sm:mt-12">
-                <p className="text-lg font-normal  text-gray-400">
-                  Trusted by 50k+ users
-                </p>
-
-                <div className="flex items-center mt-3"></div>
-                <div className="flex items-center mt-3">
-                  <div className="flex">
-                    <svg
-                      className="w-5 h-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M10.8586 4.71248C11.2178 3.60691 12.7819 3.60691 13.1412 4.71248L14.4246 8.66264C14.5853 9.15706 15.046 9.49182 15.5659 9.49182H19.7193C20.8818 9.49182 21.3651 10.9794 20.4247 11.6626L17.0645 14.104C16.6439 14.4095 16.4679 14.9512 16.6286 15.4456L17.912 19.3958C18.2713 20.5013 17.0059 21.4207 16.0654 20.7374L12.7052 18.2961C12.2846 17.9905 11.7151 17.9905 11.2945 18.2961L7.93434 20.7374C6.99388 21.4207 5.72851 20.5013 6.08773 19.3958L7.37121 15.4456C7.53186 14.9512 7.35587 14.4095 6.93529 14.104L3.57508 11.6626C2.63463 10.9794 3.11796 9.49182 4.28043 9.49182H8.43387C8.95374 9.49182 9.41448 9.15706 9.57513 8.66264L10.8586 4.71248Z"
-                        fill="url(#b)"
-                      />
-                      <defs>
-                        <linearGradient
-                          id="b"
-                          x1="3.07813"
-                          y1="3.8833"
-                          x2="23.0483"
-                          y2="6.90161"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop
-                            offset="0%"
-                            style={{ stopColor: "var(--color-cyan-500)" }}
-                          />
-                          <stop
-                            offset="100%"
-                            style={{ stopColor: "var(--color-purple-500)" }}
-                          />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <svg
-                      q="w-5 h-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M10.8586 4.71248C11.2178 3.60691 12.7819 3.60691 13.1412 4.71248L14.4246 8.66264C14.5853 9.15706 15.046 9.49182 15.5659 9.49182H19.7193C20.8818 9.49182 21.3651 10.9794 20.4247 11.6626L17.0645 14.104C16.6439 14.4095 16.4679 14.9512 16.6286 15.4456L17.912 19.3958C18.2713 20.5013 17.0059 21.4207 16.0654 20.7374L12.7052 18.2961C12.2846 17.9905 11.7151 17.9905 11.2945 18.2961L7.93434 20.7374C6.99388 21.4207 5.72851 20.5013 6.08773 19.3958L7.37121 15.4456C7.53186 14.9512 7.35587 14.4095 6.93529 14.104L3.57508 11.6626C2.63463 10.9794 3.11796 9.49182 4.28043 9.49182H8.43387C8.95374 9.49182 9.41448 9.15706 9.57513 8.66264L10.8586 4.71248Z"
-                        fill="url(#b)"
-                      />
-                      <defs>
-                        <linearGradient
-                          id="b"
-                          x1="3.07813"
-                          y1="3.8833"
-                          x2="23.0483"
-                          y2="6.90161"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop
-                            offset="0%"
-                            style={{ stopColor: "var(--color-cyan-500)" }}
-                          />
-                          <stop
-                            offset="100%"
-                            style={{ stopColor: "var(--color-purple-500)" }}
-                          />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <svg
-                      className="w-5 h-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M10.8586 4.71248C11.2178 3.60691 12.7819 3.60691 13.1412 4.71248L14.4246 8.66264C14.5853 9.15706 15.046 9.49182 15.5659 9.49182H19.7193C20.8818 9.49182 21.3651 10.9794 20.4247 11.6626L17.0645 14.104C16.6439 14.4095 16.4679 14.9512 16.6286 15.4456L17.912 19.3958C18.2713 20.5013 17.0059 21.4207 16.0654 20.7374L12.7052 18.2961C12.2846 17.9905 11.7151 17.9905 11.2945 18.2961L7.93434 20.7374C6.99388 21.4207 5.72851 20.5013 6.08773 19.3958L7.37121 15.4456C7.53186 14.9512 7.35587 14.4095 6.93529 14.104L3.57508 11.6626C2.63463 10.9794 3.11796 9.49182 4.28043 9.49182H8.43387C8.95374 9.49182 9.41448 9.15706 9.57513 8.66264L10.8586 4.71248Z"
-                        fill="url(#b)"
-                      />
-                      <defs>
-                        <linearGradient
-                          id="b"
-                          x1="3.07813"
-                          y1="3.8833"
-                          x2="23.0483"
-                          y2="6.90161"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop
-                            offset="0%"
-                            style={{ stopColor: "var(--color-cyan-500)" }}
-                          />
-                          <stop
-                            offset="100%"
-                            style={{ stopColor: "var(--color-purple-500)" }}
-                          />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <svg
-                      className="w-5 h-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M10.8586 4.71248C11.2178 3.60691 12.7819 3.60691 13.1412 4.71248L14.4246 8.66264C14.5853 9.15706 15.046 9.49182 15.5659 9.49182H19.7193C20.8818 9.49182 21.3651 10.9794 20.4247 11.6626L17.0645 14.104C16.6439 14.4095 16.4679 14.9512 16.6286 15.4456L17.912 19.3958C18.2713 20.5013 17.0059 21.4207 16.0654 20.7374L12.7052 18.2961C12.2846 17.9905 11.7151 17.9905 11.2945 18.2961L7.93434 20.7374C6.99388 21.4207 5.72851 20.5013 6.08773 19.3958L7.37121 15.4456C7.53186 14.9512 7.35587 14.4095 6.93529 14.104L3.57508 11.6626C2.63463 10.9794 3.11796 9.49182 4.28043 9.49182H8.43387C8.95374 9.49182 9.41448 9.15706 9.57513 8.66264L10.8586 4.71248Z"
-                        fill="url(#b)"
-                      />
-                      <defs>
-                        <linearGradient
-                          id="b"
-                          x1="3.07813"
-                          y1="3.8833"
-                          x2="23.0483"
-                          y2="6.90161"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop
-                            offset="0%"
-                            style={{ stopColor: "var(--color-cyan-500)" }}
-                          />
-                          <stop
-                            offset="100%"
-                            style={{ stopColor: "var(--color-purple-500)" }}
-                          />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                  </div>
-                  <span className="ml-2 text-base font-normal text-white">
-                    {" "}
-                    4.1/5{" "}
-                  </span>
-                  <span className="ml-1 text-base font-normal text-gray-500">
-                    {" "}
-                    (14k Reviews){" "}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="absolute inset-0">
-                <svg
-                  className="blur-3xl filter opacity-70"
-                  style={{ filter: "blur(64px)" }}
-                  width="444"
-                  height="536"
-                  viewBox="0 0 444 536"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M225.919 112.719C343.98 64.6648 389.388 -70.487 437.442 47.574C485.496 165.635 253.266 481.381 135.205 529.435C17.1445 577.488 57.9596 339.654 9.9057 221.593C-38.1482 103.532 107.858 160.773 225.919 112.719Z"
-                    fill="url(#c)"
-                  />
-                  <defs>
-                    <linearGradient
-                      id="c"
-                      x1="82.7339"
-                      y1="550.792"
-                      x2="-39.945"
-                      y2="118.965"
-                      gradientUnits="userSpaceOnUse"
-                    >
-                      <stop
-                        offset="0%"
-                        style={{ stopColor: "var(--color-cyan-500)" }}
-                      />
-                      <stop
-                        offset="100%"
-                        style={{ stopColor: "var(--color-purple-500)" }}
-                      />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-
-              <div className="absolute inset-0">
-                <img
-                  className="object-cover w-full h-full opacity-50"
-                  src="https://landingfoliocom.imgix.net/store/collection/dusk/images/noise.png"
-                  alt=""
-                />
-              </div>
-
-              <DotLottieReact
-                src="https://lottie.host/a349f2a2-00d0-4d10-947a-25eb5475015b/V4T6cReIh4.json"
-                loop
-                autoplay
-                style={{
-                  width: "600px",
-                  height: "600px",
-                  position: "relative",
-                  zIndex: 10,
-                  margin: "0 auto",
-                  display: "block",
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Macbook Section */}
-      <MacbookDemo />
-
-      {/* Carousel Section */}
-      <CarouselDemo />
-      <Footer/>
-    </div>
-  );
-}
+export default LandingPage;
