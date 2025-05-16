@@ -13,11 +13,11 @@ const logRoomInfo = (room, roomId) => {
 };
 
 // Initialize the socket server with direct handlers
-export const initSimpleCollabSocket = (server) => {
+export const initSimpleCollabSocket = (server, existingIo = null) => {
   console.log("Initializing simple collab socket server...");
   
-  // Create a new Socket.IO instance attached to the HTTP server
-  const io = new Server(server, {
+  // Use existing io instance if provided, otherwise create a new one
+  const io = existingIo || new Server(server, {
     cors: {
       origin: "*", // Allow all origins (for development)
       methods: ["GET", "POST"],

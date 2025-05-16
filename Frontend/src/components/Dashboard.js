@@ -153,25 +153,29 @@ function Dashboard() {
   // Function to initialize socket
   const initializeSocket = (userId) => {
     try {
-      console.log('Initializing socket connection for user:', userId);
+      console.log('SOCKET DEBUG: Initializing connection for user:', userId);
       
       // Close any existing connections
       if (socket) {
-        console.log('Closing existing socket connection:', socket.id);
+        console.log('SOCKET DEBUG: Closing existing connection:', socket.id);
         socket.disconnect();
       }
       
+      // Force polling first to handle WebSocket issues
       const newSocket = io('http://localhost:3050', {
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
         reconnectionDelay: 1000,
-        timeout: 10000,
-        transports: ['websocket', 'polling'],
-        query: { userId } // Add userId as a query parameter
+        timeout: 20000,
+        transports: ['polling', 'websocket'], // Try polling first
+        query: { userId }, // Add userId as a query parameter
+        autoConnect: true,
+        forceNew: true
       });
       
       // Handle connection events
       newSocket.on('connect', () => {
-        console.log('Socket connected successfully:', newSocket.id);
+        console.log('SOCKET DEBUG: Connected successfully:', newSocket.id);
+        console.log('SOCKET DEBUG: Transport used:', newSocket.io.engine.transport.name);
         setError(null); // Clear any previous connection errors
         setSocketStatus('connected');
         
@@ -179,23 +183,36 @@ function Dashboard() {
         newSocket.emit('authenticate', { token, userId });
         
         // After connection, explicitly join the user's room for direct messages
-        console.log(`Joining personal room for user: ${userId}`);
+        console.log(`SOCKET DEBUG: Joining personal room for user: ${userId}`);
+        
+        // Debug: Check that we can send messages
+        console.log('SOCKET DEBUG: Ready for sending messages:', newSocket.connected);
       });
       
       newSocket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
+        console.error('SOCKET DEBUG: Connection error:', error);
+        console.error('SOCKET DEBUG: Error message:', error.message);
+        console.error('SOCKET DEBUG: Error details:', JSON.stringify(error));
         setSocketStatus('error');
         setError('Connection error. Messages may not send. Attempting to reconnect...');
+        
+        // Force reconnect after a short delay
+        setTimeout(() => {
+          if (!newSocket.connected) {
+            console.log('SOCKET DEBUG: Forcing reconnection...');
+            newSocket.connect();
+          }
+        }, 3000);
       });
       
       newSocket.on('reconnect_attempt', (attemptNumber) => {
-        console.log(`Socket reconnection attempt #${attemptNumber}`);
+        console.log(`SOCKET DEBUG: Reconnection attempt #${attemptNumber}`);
         setSocketStatus('connecting');
         setError(`Connection lost. Reconnection attempt #${attemptNumber}...`);
       });
       
       newSocket.on('reconnect', () => {
-        console.log('Socket reconnected successfully');
+        console.log('SOCKET DEBUG: Reconnected successfully');
         setSocketStatus('connected');
         setError(null);
         // Re-authenticate after reconnection
@@ -203,12 +220,15 @@ function Dashboard() {
       });
       
       newSocket.on('disconnect', (reason) => {
-        console.log(`Socket disconnected: ${reason}`);
+        console.log(`SOCKET DEBUG: Disconnected: ${reason}`);
         setSocketStatus('disconnected');
         
-        if (reason === 'io server disconnect') {
-          // Server disconnected us, need to reconnect manually
-          newSocket.connect();
+        if (reason === 'io server disconnect' || reason === 'transport close') {
+          // Server disconnected us or transport closed, try to reconnect manually
+          console.log('SOCKET DEBUG: Attempting manual reconnection...');
+          setTimeout(() => {
+            newSocket.connect();
+          }, 1000);
         }
         // else the socket will automatically try to reconnect
       });
@@ -868,6 +888,12 @@ function Dashboard() {
   const handleSelectFriend = (friend) => {
     console.log('Selected friend object:', friend);
     
+    // Make sure we have a valid friend object
+    if (!friend) {
+      console.error('Invalid friend object:', friend);
+      return;
+    }
+    
     // Normalize the friend object to ensure it has consistent properties
     const normalizedFriend = {
       _id: friend._id || friend.id,
@@ -888,46 +914,81 @@ function Dashboard() {
 
   // Fetch messages for a selected friend
   const fetchMessages = async (friendId) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`http://localhost:3050/api/messages/${friendId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const messagesData = await response.json();
-        
-        // Sort messages by timestamp
-        const sortedMessages = messagesData.sort((a, b) => 
-          new Date(a.createdAt) - new Date(b.createdAt)
-        );
-        
-        console.log(`Fetched ${sortedMessages.length} messages with ${friendId}`);
-        setMessages(sortedMessages);
-        
-        // Mark received messages as read
-        if (socket && sortedMessages.some(msg => msg.sender === friendId && !msg.read)) {
-          socket.emit('mark-messages-read', { senderId: friendId });
-        }
-      } else {
-        console.error('Failed to fetch messages');
-      }
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-    } finally {
-      setLoading(false);
-      
-      // Scroll to bottom of messages
-      setTimeout(() => {
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 100);
+    if (!friendId) {
+      console.error('Invalid friend ID provided to fetchMessages:', friendId);
+      return;
     }
+
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const attemptFetch = async () => {
+      try {
+        setLoading(true);
+        console.log(`Fetching messages for friend ID: ${friendId}`);
+        
+        const response = await fetch(`http://localhost:3050/api/messages/${friendId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const messagesData = await response.json();
+          
+          // Sort messages by timestamp
+          const sortedMessages = messagesData.sort((a, b) => 
+            new Date(a.createdAt) - new Date(b.createdAt)
+          );
+          
+          console.log(`Fetched ${sortedMessages.length} messages with ${friendId}`);
+          setMessages(sortedMessages);
+          
+          // Mark received messages as read
+          if (socket && socket.connected && sortedMessages.some(msg => msg.sender === friendId && !msg.read)) {
+            console.log('Marking messages as read');
+            socket.emit('mark-messages-read', { senderId: friendId });
+          }
+        } else {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('Failed to fetch messages:', errorData);
+          
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`Retrying message fetch (${retryCount}/${maxRetries})...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return attemptFetch();
+          } else {
+            setError(`Could not load messages. ${errorData.error || response.statusText}`);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching messages:', err);
+        
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`Retrying message fetch after error (${retryCount}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return attemptFetch();
+        } else {
+          setError('Failed to load messages. Please try again later.');
+        }
+      } finally {
+        setLoading(false);
+        
+        // Scroll to bottom of messages
+        setTimeout(() => {
+          if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+      }
+    };
+    
+    // Start the fetch process
+    await attemptFetch();
   };
 
   // Handle sending a message
@@ -935,12 +996,12 @@ function Dashboard() {
     if (e) e.preventDefault();
     
     if (!newMessage.trim() || !selectedFriend) {
-      console.log("Cannot send empty message or no friend selected");
+      console.log("DEBUG: Cannot send empty message or no friend selected");
       return;
     }
     
     if (!socket) {
-      console.error("Socket connection not established");
+      console.error("DEBUG: Socket connection not established");
       setError("Connection issue. Please refresh the page.");
       return;
     }
@@ -950,11 +1011,17 @@ function Dashboard() {
       const messageRefId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
       const messageToSend = newMessage.trim();
       
-      console.log(`Sending message to ${selectedFriend.id} with refId: ${messageRefId}`);
+      // Ensure we have the correct friend ID format
+      const friendId = selectedFriend._id || selectedFriend.id;
+      
+      console.log(`DEBUG: Sending message to ${friendId} with refId: ${messageRefId}`);
+      console.log('DEBUG: Socket ID:', socket.id);
+      console.log('DEBUG: Socket connected:', socket.connected);
+      console.log('DEBUG: Socket status:', socketStatus);
       
       // Clear any existing timeout
       if (messageTimeoutRef.current) {
-        console.log('Clearing existing timeout before sending new message');
+        console.log('DEBUG: Clearing existing timeout before sending new message');
         clearTimeout(messageTimeoutRef.current);
         messageTimeoutRef.current = null;
       }
@@ -964,7 +1031,7 @@ function Dashboard() {
         id: messageRefId, // Use our reference ID
         senderId: userId,
         senderName: userName,
-        receiverId: selectedFriend.id,
+        receiverId: friendId,
         text: messageToSend,
         timestamp: new Date(),
         pending: true,
@@ -976,20 +1043,15 @@ function Dashboard() {
       // Clear message input before sending to avoid multiple sends on rapid clicks
       setNewMessage('');
       
-      // Use socket to send message with reference ID
-      socket.emit('send-direct-message', {
-        receiverId: selectedFriend.id,
-        message: messageToSend,
-        refId: messageRefId // Include reference ID in the socket message
-      });
+      // Check if socket is connected
+      console.log('DEBUG: Socket connected status before sending:', socket.connected);
       
-      // Set new timeout with the refId in scope for better debugging
+      // Set new timeout - we'll use this as a backup in case the socket acknowledgment fails
       messageTimeoutRef.current = setTimeout(() => {
-        // If no response after 5 seconds, show error
-        console.log(`Message send timed out for refId: ${messageRefId}`);
-        setError("Message could not be delivered. Please try again.");
+        console.log(`DEBUG: Message send timed out for refId: ${messageRefId}`);
+        setError("Message could not be delivered. Network issue detected.");
         
-        // Remove pending status from message
+        // Update message status to error
         setMessages(prevMessages => 
           prevMessages.map(msg => 
             (msg.refId === messageRefId || msg.id === messageRefId)
@@ -1002,8 +1064,49 @@ function Dashboard() {
         messageTimeoutRef.current = null;
       }, 5000);
       
+      console.log('DEBUG: About to emit send-direct-message event');
+      // Send the message with acknowledgment callback
+      socket.emit('send-direct-message', {
+        receiverId: friendId,
+        message: messageToSend,
+        refId: messageRefId // Include reference ID in the socket message
+      }, (response) => {
+        // This is the acknowledgment callback
+        console.log('DEBUG: Message send acknowledgment received:', response);
+        
+        // Clear timeout since we received server response (success or error)
+        if (messageTimeoutRef.current) {
+          clearTimeout(messageTimeoutRef.current);
+          messageTimeoutRef.current = null;
+        }
+        
+        if (response && response.success) {
+          // Message was successfully received by server
+          console.log(`DEBUG: Message ${messageRefId} successfully delivered to server`);
+          
+          // No need to update message status, the receive-direct-message event will handle it
+        } else {
+          // Server reported an error
+          console.error('DEBUG: Server reported error with message:', response?.error || 'Unknown error');
+          
+          // Update message status to error
+          setMessages(prevMessages => 
+            prevMessages.map(msg => 
+              (msg.refId === messageRefId || msg.id === messageRefId)
+                ? {...msg, error: true, pending: false} 
+                : msg
+            )
+          );
+          
+          // Show error to user
+          setError(response?.error || "Message could not be delivered. Please try again.");
+        }
+      });
+      
+      console.log('DEBUG: Emitted send-direct-message event');
+      
     } catch (err) {
-      console.error('Error sending message:', err);
+      console.error('DEBUG: Error in handleSendMessage:', err);
       setError('Failed to send message. Please try again.');
     }
   };
@@ -1422,11 +1525,24 @@ function Dashboard() {
 
             {/* Message input */}
               <div className="p-4 border-t border-[#2A2A3A] bg-[#14141B]/80 backdrop-blur-sm">
-                {socketStatus === 'error' && (
-                  <div className="mb-2 text-[#E94560] text-xs bg-[#E94560]/10 p-2 rounded">
-                    {error || 'Connection error. Messages may not send.'}
-              </div>
-              )}
+                {socketStatus === 'error' || socketStatus === 'disconnected' ? (
+                  <div className="mb-2 text-[#E94560] text-xs bg-[#E94560]/10 p-2 rounded flex justify-between items-center">
+                    <span>{error || `Connection ${socketStatus}. Messages may not send.`}</span>
+                    <button 
+                      onClick={() => {
+                        console.log('Reconnecting socket manually...');
+                        if (socket) {
+                          socket.connect();
+                        } else {
+                          initializeSocket(userId);
+                        }
+                      }} 
+                      className="ml-2 px-2 py-1 bg-[#E94560]/20 hover:bg-[#E94560]/30 rounded text-[#E94560] text-xs"
+                    >
+                      Reconnect
+                    </button>
+                  </div>
+                ) : null}
               <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
                 <input
                   type="text"

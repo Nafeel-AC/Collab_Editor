@@ -234,21 +234,31 @@ export const initSocketServer = (io) => {
     // ======= MESSAGING FUNCTIONALITY =======
     
     // Handle direct message
-    socket.on("send-direct-message", async ({ receiverId, message, refId }) => {
+    socket.on("send-direct-message", async ({ receiverId, message, refId }, callback) => {
       try {
         if (!userId) {
           console.error("Direct message attempted without authentication");
           socket.emit("error", { message: "You must be authenticated to send messages" });
+          if (callback) callback({ success: false, error: "You must be authenticated to send messages" });
           return;
         }
         
         if (!receiverId || !message) {
           console.error(`Invalid direct message data: receiverId=${receiverId}, message length=${message ? message.length : 0}`);
           socket.emit("error", { message: "Invalid message data" });
+          if (callback) callback({ success: false, error: "Invalid message data" });
           return;
         }
         
         console.log(`User ${userId} sending message to ${receiverId}: ${message.substring(0, 30)}${message.length > 30 ? '...' : ''} (ref: ${refId || 'none'})`);
+        
+        // First verify the receiver exists
+        const receiver = await User.findById(receiverId);
+        if (!receiver) {
+          console.error(`Receiver not found in database: ${receiverId}`);
+          if (callback) callback({ success: false, error: "Recipient not found" });
+          return;
+        }
         
         // Store message in database
         const newMessage = new Message({
@@ -266,6 +276,7 @@ export const initSocketServer = (io) => {
         if (!sender) {
           console.error(`Sender not found in database: ${userId}`);
           socket.emit("error", { message: "Sender not found" });
+          if (callback) callback({ success: false, error: "Sender not found" });
           return;
         }
         
@@ -311,6 +322,15 @@ export const initSocketServer = (io) => {
         } else {
           console.log(`User ${receiverId} is offline, message saved to database only`);
         }
+        
+        // Send acknowledgment to caller if callback provided
+        if (callback) {
+          callback({ 
+            success: true, 
+            messageId: savedMessage._id.toString(),
+            timestamp: savedMessage.createdAt
+          });
+        }
       } catch (error) {
         console.error("Error sending direct message:", error);
         socket.emit("error", { message: "Failed to send message", details: error.message });
@@ -318,6 +338,11 @@ export const initSocketServer = (io) => {
         // If there was a refId, send an error notification for the specific message
         if (refId) {
           socket.emit("message-error", { refId, error: error.message });
+        }
+        
+        // Send error via callback if provided
+        if (callback) {
+          callback({ success: false, error: error.message || "Failed to send message" });
         }
       }
     });

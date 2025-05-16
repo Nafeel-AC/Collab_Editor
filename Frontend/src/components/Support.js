@@ -53,7 +53,7 @@ function Support() {
             />
           </div>
         </div>
-        <h1 className="text-4xl font-bold mb-2">Support Hub</h1>
+        <h1 className="text-4xl font-bold mb-2">Support</h1>
         <p className="text-gray-400 mb-8">Need help? Anytime, Anywhere</p>
         
         {/* Search Bar */}

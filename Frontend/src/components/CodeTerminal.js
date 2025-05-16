@@ -154,6 +154,7 @@ STRICT RULES:
 5. STOP after EACH user input is needed and wait
 6. For input prompts, show EXACTLY what would appear (e.g., "Enter first number: ")
 7. Never skip or combine multiple input prompts - show each one separately
+8. IMMEDIATELY stop and ask for input when code reaches an input statement
 
 For input requests, respond with EXACTLY:
 [INPUT_REQUIRED]<input prompt text>
@@ -319,10 +320,13 @@ ${code}
   // Check if the output has an input prompt at the end
   const hasInputPrompt = (text) => {
     const lastLine = text.split('\n').pop() || '';
-    return lastLine.includes(':') || 
+    const looksLikePrompt = 
+      lastLine.toLowerCase().includes('enter') || 
+      lastLine.toLowerCase().includes('input') || 
            lastLine.includes('?') || 
-           lastLine.toLowerCase().includes('enter') ||
-           lastLine.toLowerCase().includes('input');
+      (lastLine.includes(':') && !lastLine.includes('error:') && !lastLine.includes('exception:'));
+    
+    return looksLikePrompt;
   };
 
   // Try to guess the next input prompt based on code analysis
@@ -342,6 +346,18 @@ ${code}
 
   // Clean output to remove explanations but preserve input prompts
   const cleanOutputForInputPrompts = (output) => {
+    // Check if output contains known input patterns
+    if (hasInputPrompt(output)) {
+      const lines = output.split('\n');
+      const lastLine = lines[lines.length - 1];
+      
+      // If the last line looks like an input prompt, we'll treat it as requiring input
+      // by returning the cleaned output with an INPUT_REQUIRED tag
+      if (hasInputPrompt(lastLine)) {
+        return '[INPUT_REQUIRED]' + output;
+      }
+    }
+    
     // Remove lines that look like explanations
     const lines = output.split('\n');
     const cleanedLines = lines.filter(line => {

@@ -4,8 +4,9 @@ import dotenv from "dotenv";
 import { Server } from "socket.io";
 import { connect_DB } from "./config/db.js";
 import { app } from "./app.js";
-// Import only what we're using
+// Import both socket initializers
 import { initSimpleCollabSocket } from "./simpleCollab.js";
+import { initSocketServer } from "./socketServer.js";
 
 dotenv.config({
     path: "./.env",
@@ -17,10 +18,27 @@ const server = http.createServer(app);
 // set up the server
 const PORT = process.env.PORT || 3050; // Make sure port matches frontend
 
-// Do NOT create a Socket.IO instance here
-// Just pass the server to initSimpleCollabSocket which will create its own Socket.IO instance
+// Create a single Socket.IO instance that both modules will use
+console.log("Initializing Socket.IO server...");
+const io = new Server(server, {
+    cors: {
+        origin: ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"],
+        methods: ["GET", "POST"],
+        credentials: true,
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    },
+    transports: ['polling', 'websocket'], // Try polling first to handle potential WebSocket issues
+    maxHttpBufferSize: 1e8, // 100 MB max for large code files
+    pingTimeout: 60000, // Increase ping timeout
+    pingInterval: 25000, // Check connection every 25 seconds
+});
+
+// Initialize both socket servers with the same io instance
 console.log("Initializing simple collaborative editing socket server...");
-initSimpleCollabSocket(server);
+initSimpleCollabSocket(server, io);
+
+console.log("Initializing main socket server for messaging...");
+initSocketServer(io);
 
 // setting up the routes
 connect_DB().then(() => {

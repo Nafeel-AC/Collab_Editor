@@ -17,6 +17,10 @@ const SignupPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [glowIntensity, setGlowIntensity] = useState(0.3);
+  const [passwordStrength, setPasswordStrength] = useState({
+    strength: '',
+    color: ''
+  });
 
   // Check if already logged in
   useEffect(() => {
@@ -37,14 +41,52 @@ const SignupPage = () => {
     return () => clearInterval(intervalId);
   }, []);
 
+  const checkPasswordStrength = (password) => {
+    // Check password length
+    if (password.length === 0) {
+      return { strength: '', color: '' };
+    }
+    
+    if (password.length < 8) {
+      return { strength: 'Too short', color: 'text-red-500' };
+    }
+    
+    // Check password strength
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChars = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+    
+    const strength = hasUpperCase + hasLowerCase + hasNumbers + hasSpecialChars;
+    
+    if (strength <= 1) {
+      return { strength: 'Weak', color: 'text-red-500' };
+    } else if (strength === 2) {
+      return { strength: 'Moderate', color: 'text-yellow-500' };
+    } else if (strength >= 3) {
+      return { strength: 'Strong', color: 'text-green-500' };
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+    
+    // Check password strength when password field changes
+    if (name === 'password') {
+      setPasswordStrength(checkPasswordStrength(value));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Validate password length
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
 
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
@@ -163,6 +205,25 @@ const SignupPage = () => {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {formData.password && (
+                <div className="mt-1 flex items-center">
+                  <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${
+                        passwordStrength.strength === 'Weak' || passwordStrength.strength === 'Too short' 
+                          ? 'bg-red-500 w-1/3' 
+                          : passwordStrength.strength === 'Moderate' 
+                            ? 'bg-yellow-500 w-2/3' 
+                            : 'bg-green-500 w-full'
+                      }`}
+                    />
+                  </div>
+                  <span className={`ml-2 text-xs ${passwordStrength.color}`}>
+                    {passwordStrength.strength}
+                  </span>
+                </div>
+              )}
+              <p className="text-xs text-gray-400 mt-1">Password must be at least 8 characters</p>
             </div>
 
             <div className="space-y-2">

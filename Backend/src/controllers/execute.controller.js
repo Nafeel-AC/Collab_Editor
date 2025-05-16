@@ -189,7 +189,25 @@ const handleUserInput = async (req, res, executionId, input) => {
           topK: 1,
           topP: 1,
           maxOutputTokens: 8192,
-        }
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_ONLY_HIGH"
+          },
+          {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_ONLY_HIGH"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_ONLY_HIGH"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_ONLY_HIGH"
+          }
+        ]
       })
     });
     
@@ -301,7 +319,7 @@ IMPORTANT: If the code needs more than ${inputs.length} inputs, respond with [IN
     : '';
 
   const basePrompt = `
-You are a terminal executing ${language} code. You are NOT a chatbot, assistant, or teacher.
+You are a terminal executing ${language} code. You MUST act exactly like a real terminal.
 
 CRITICAL REQUIREMENTS:
 1. Display EXACTLY what a real terminal would show when running this code - nothing more
@@ -312,6 +330,7 @@ CRITICAL REQUIREMENTS:
 6. Show syntax errors exactly as a real compiler/interpreter would
 7. Show ONLY the terminal output, as if this is a real terminal window
 8. Don't skip input prompts - show each one separately and wait for user input
+9. NEVER SKIP asking for input - when an input is required in the code, immediately show [INPUT_REQUIRED] followed by the exact prompt
 
 When input is needed but none is provided or more input is needed, respond with:
 [INPUT_REQUIRED]<exact input prompt from code>
@@ -382,13 +401,15 @@ const cleanGeminiOutput = (output, language) => {
     
     // Find the first line that looks like an actual prompt
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('Enter') || 
-          lines[i].includes('Input') || 
-          lines[i].includes('Type') ||
-          lines[i].includes('?') ||
-          lines[i].includes(':')) {
-        // We found what's likely an input prompt - return from here onwards
-        return lines.slice(i).join('\n').trim();
+      const line = lines[i].toLowerCase();
+      if (line.includes('enter') || 
+          line.includes('input') || 
+          line.includes('type') ||
+          line.includes('?') ||
+          line.includes(':')) {
+        // We found what's likely an input prompt - return from here onwards and mark it as requiring input
+        const remainingOutput = lines.slice(i).join('\n').trim();
+        return '[INPUT_REQUIRED]' + remainingOutput;
       }
     }
   }
@@ -417,6 +438,16 @@ const cleanGeminiOutput = (output, language) => {
   
   // Remove any trailing "Code executed successfully" type messages
   output = output.replace(/\n(Code|Program) (executed|completed|finished|ran) successfully\.?\s*$/i, '');
+  
+  // Look for common input patterns at the end of output
+  const lastLine = output.split('\n').pop() || '';
+  if (lastLine.toLowerCase().includes('enter') || 
+      lastLine.toLowerCase().includes('input') || 
+      lastLine.includes('?') || 
+      (lastLine.includes(':') && !lastLine.includes('Error:') && !lastLine.includes('Exception:'))) {
+    // If the last line looks like an input prompt, mark it as requiring input
+    return '[INPUT_REQUIRED]' + output;
+  }
   
   return output.trim();
 }; 
