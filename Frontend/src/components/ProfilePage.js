@@ -43,6 +43,34 @@ const darkModeStyle = `
   }
 `;
 
+// Profile Image component with error handling
+const ProfileImageWithFallback = ({ src, userName, className }) => {
+  const [imgSrc, setImgSrc] = useState(src);
+  const [hasError, setHasError] = useState(false);
+  
+  useEffect(() => {
+    setImgSrc(src);
+    setHasError(false);
+  }, [src]);
+  
+  const handleError = () => {
+    if (!hasError) {
+      console.error("Error loading profile image:", src);
+      setHasError(true);
+      setImgSrc(`https://ui-avatars.com/api/?name=${encodeURIComponent(userName || 'User')}&background=random&size=200`);
+    }
+  };
+  
+  return (
+    <img 
+      src={imgSrc} 
+      alt={userName || 'User'}
+      className={className}
+      onError={handleError}
+    />
+  );
+};
+
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -490,15 +518,25 @@ const ProfilePage = () => {
       const uploadFormData = new FormData();
       uploadFormData.append('profilePic', selectedFile);
       
+      // Log the form data for debugging
+      console.log("Uploading file:", selectedFile.name, selectedFile.type, selectedFile.size);
+      console.log("Token available:", !!token);
+      
+      // Set up headers correctly
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        // Do NOT set Content-Type here - axios will automatically set it with the correct boundary for multipart/form-data
+      };
+      
+      console.log("Making upload request to:", `${API_BASE_URL}/api/users/profile-picture`);
+      
       const response = await axios.post(`${API_BASE_URL}/api/users/profile-picture`, uploadFormData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        },
+        headers: headers,
         withCredentials: true,
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(percentCompleted);
+          console.log(`Upload progress: ${percentCompleted}%`);
         }
       });
       
@@ -527,10 +565,13 @@ const ProfilePage = () => {
       }
     } catch (err) {
       console.error('Error uploading profile picture:', err);
+      if (err.response) {
+        console.error('Response error data:', err.response.data);
+        console.error('Response error status:', err.response.status);
+        console.error('Response error headers:', err.response.headers);
+      }
       alert('Failed to upload profile picture: ' + (err.response?.data?.error || err.message));
       return false;
-    } finally {
-      // ... existing code ...
     }
   };
   
@@ -818,9 +859,9 @@ const ProfilePage = () => {
                             <div className="flex-shrink-0 h-8 w-8 relative">
                               <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/5 blur-sm"></div>
                               {user.profilePic ? (
-                                <img 
+                                <ProfileImageWithFallback 
                                   src={getImageUrl(user.profilePic)} 
-                                  alt={user.userName} 
+                                  userName={user.userName}
                                   className="h-8 w-8 rounded-full object-cover relative z-10"
                                 />
                               ) : (
@@ -1219,9 +1260,9 @@ const ProfilePage = () => {
                     </div>
                     <div className="relative w-24 h-24 mb-4 group">
                       <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-md"></div>
-                      <img 
+                      <ProfileImageWithFallback 
                         src={previewUrl || formData.profilePic || `https://ui-avatars.com/api/?name=${formData.userName}&background=random&size=200`} 
-                        alt="Profile Preview"
+                        userName={formData.userName}
                         className="w-24 h-24 rounded-full object-cover border-2 border-[#2A2A3A] relative z-10"
                       />
                       <div 
@@ -1290,15 +1331,10 @@ const ProfilePage = () => {
                   <>
                     <div className="w-24 h-24 mb-4 relative">
                       <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-md"></div>
-                      <img 
+                      <ProfileImageWithFallback 
                         src={user.profilePic || `https://ui-avatars.com/api/?name=${user.userName}&background=random&size=200`} 
-                        alt={user.userName}
+                        userName={user.userName}
                         className="w-24 h-24 rounded-full object-cover border-2 border-[#2A2A3A] relative z-10"
-                        onError={(e) => {
-                          console.error("Error loading profile image:", e);
-                          e.target.onerror = null;
-                          e.target.src = `https://ui-avatars.com/api/?name=${user.userName || 'User'}&background=random&size=200`;
-                        }}
                       />
                     </div>
                     <h2 className="text-xl font-bold text-white">{user.userName}</h2>
@@ -1741,9 +1777,9 @@ const ProfilePage = () => {
                           <div className="flex items-center mb-3">
                             <div className="h-10 w-10 rounded-full bg-[#4D5DFE] flex-shrink-0 flex items-center justify-center shadow-md shadow-[#3A4AE1]/10">
                               {group.sender.profilePic ? (
-                                <img 
+                                <ProfileImageWithFallback 
                                   src={group.sender.profilePic} 
-                                  alt={group.sender.name}
+                                  userName={group.sender.name}
                                   className="h-10 w-10 rounded-full object-cover"
                                 />
                               ) : (

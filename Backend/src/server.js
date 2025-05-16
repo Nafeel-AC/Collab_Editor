@@ -7,6 +7,7 @@ import { app } from "./app.js";
 // Import both socket initializers
 import { initSimpleCollabSocket } from "./simpleCollab.js";
 import { initSocketServer } from "./socketServer.js";
+import { v2 as cloudinary } from 'cloudinary';
 
 dotenv.config({
     path: "./.env",
@@ -46,6 +47,48 @@ initSimpleCollabSocket(server, io);
 
 console.log("Initializing main socket server for messaging...");
 initSocketServer(io);
+
+// Before starting the server, after other initialization code
+// Test Cloudinary configuration
+const testCloudinaryConfig = async () => {
+  try {
+    // Get environment variables
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    
+    // Log the credentials
+    console.log('Cloudinary Configuration:');
+    console.log('- Cloud Name:', cloudName || 'Not set');
+    console.log('- API Key:', apiKey ? '***' + apiKey.slice(-4) : 'Not set');
+    console.log('- API Secret:', apiSecret ? '******' : 'Not set');
+    
+    // Configure Cloudinary
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret
+    });
+    
+    // Test the configuration with a ping
+    const result = await cloudinary.api.ping();
+    console.log('✅ Cloudinary configuration successful:', result.status);
+    return true;
+  } catch (error) {
+    console.error('❌ Cloudinary configuration error:', error.message);
+    console.error('The app will start, but profile image uploads may not work.');
+    return false;
+  }
+};
+
+// Call the test function before starting the server
+testCloudinaryConfig()
+  .then(() => {
+    console.log('Server initialization continues...');
+  })
+  .catch(error => {
+    console.error('Error testing Cloudinary config:', error);
+  });
 
 // setting up the routes
 connect_DB().then(() => {

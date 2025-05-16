@@ -624,40 +624,67 @@ const uploadProfilePicture = async (req, res) => {
     try {
         const userId = req.userId; // From auth middleware
         
+        console.log('Upload profile picture request received for user:', userId);
+        
         // Check if a file was uploaded
         if (!req.file) {
+            console.log('No file was uploaded');
             return res.status(400).json({ error: "No file uploaded" });
         }
         
-        // Upload to Cloudinary instead of storing locally
-        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
-            folder: 'profile_pictures',
-            public_id: `user_${userId}_${Date.now()}`,
-            overwrite: true
+        console.log('File received:', {
+            fieldname: req.file.fieldname,
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            buffer: req.file.buffer ? `${req.file.buffer.length} bytes` : 'No buffer'
         });
         
-        // The secure_url is the HTTPS URL of the uploaded image
-        const fileUrl = cloudinaryResult.secure_url;
-        
-        // Update the user's profile with the new picture URL from Cloudinary
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            { profilePic: fileUrl },
-            { new: true } // Return the updated document
-        );
-        
-        if (!updatedUser) {
-            return res.status(404).json({ error: "User not found" });
+        // Upload to Cloudinary
+        if (!req.file.buffer) {
+            console.error('No file buffer available');
+            return res.status(400).json({ error: "File buffer not available" });
         }
         
-        return res.status(200).json({ 
-            message: "Profile picture updated successfully",
-            profilePic: fileUrl,
-            user: updatedUser
-        });
+        try {
+            // Upload to Cloudinary
+            const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+                folder: 'profile_pictures',
+                public_id: `user_${userId}_${Date.now()}`,
+                overwrite: true
+            });
+            
+            // The secure_url is the HTTPS URL of the uploaded image
+            const fileUrl = cloudinaryResult.secure_url;
+            console.log('Cloudinary upload successful, URL:', fileUrl);
+            
+            // Update the user's profile with the new picture URL from Cloudinary
+            const updatedUser = await User.findByIdAndUpdate(
+                userId,
+                { profilePic: fileUrl },
+                { new: true } // Return the updated document
+            );
+            
+            if (!updatedUser) {
+                console.error('User not found after successful upload');
+                return res.status(404).json({ error: "User not found" });
+            }
+            
+            return res.status(200).json({ 
+                message: "Profile picture updated successfully",
+                profilePic: fileUrl,
+                user: updatedUser
+            });
+        } catch (cloudinaryError) {
+            console.error('Cloudinary upload error:', cloudinaryError);
+            return res.status(500).json({ 
+                error: "Failed to upload to Cloudinary",
+                details: cloudinaryError.message || 'Unknown error'
+            });
+        }
     } catch (error) {
         console.error("Error uploading profile picture:", error);
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message || 'Server error' });
     }
 };
 
