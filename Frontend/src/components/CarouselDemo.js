@@ -48,37 +48,7 @@ const data = [
     title: "Git Version Control",
     src: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb",
     content: <DummyContent />,
-  },
-  {
-    category: "Communication",
-    title: "Built-in Chat & Comments",
-    src: "https://images.unsplash.com/photo-1531498860502-7c67cf02f657",
-    content: <DummyContent />,
-  },
-  {
-    category: "Code Quality",
-    title: "Syntax Highlighting & Linting",
-    src: "https://images.unsplash.com/photo-1580927752452-89d86da3fa0a",
-    content: <DummyContent />,
-  },
-  {
-    category: "Productivity",
-    title: "Code Snippets & Templates",
-    src: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97",
-    content: <DummyContent />,
-  },
-  {
-    category: "Security",
-    title: "Secure Code Sharing",
-    src: "https://images.unsplash.com/photo-1555066931-bf19f8fd1085",
-    content: <DummyContent />,
-  },
-  {
-    category: "Team Management",
-    title: "Role-based Access Control",
-    src: "https://images.unsplash.com/photo-1552664730-d307ca884978",
-    content: <DummyContent />,
-  },
+  }
 ];
 
 export function CarouselDemo() {

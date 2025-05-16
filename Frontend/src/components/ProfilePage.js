@@ -1270,7 +1270,13 @@ const ProfilePage = () => {
             </div>
             
             <button 
-              onClick={() => setEditMode(!editMode)}
+              onClick={() => {
+                if (editMode) {
+                  handleSubmit({ preventDefault: () => {} });
+                } else {
+                  setEditMode(true);
+                }
+              }}
               className={`flex items-center rounded-md px-3 py-1.5 text-sm ${
                 editMode 
                   ? 'bg-[#4ADE80]/20 text-[#4ADE80] hover:bg-[#4ADE80]/30' 
