@@ -27,7 +27,7 @@ const SignupPage = () => {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      navigate("/home", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   }, [navigate]);
 
@@ -110,8 +110,8 @@ const SignupPage = () => {
         localStorage.setItem("userName", response.data.userName);
         localStorage.setItem("userId", response.data.userId);
         
-        // Redirect to home page after successful registration
-        navigate("/home", { replace: true });
+        // Redirect to dashboard after successful registration
+        navigate("/dashboard", { replace: true });
       } else {
         setError("Invalid registration response");
       }
