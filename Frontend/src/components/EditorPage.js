@@ -62,12 +62,18 @@ const EditorPage = () => {
     console.log('Connecting to socket server...');
     
     // Connect to WebSocket server
+    // Get authentication token
+    const token = localStorage.getItem('token');
+    
     socketRef.current = io(API_BASE_URL, {
       withCredentials: true,
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      auth: {
+        token: token
+      }
     });
     
     // Handle connection events
@@ -78,7 +84,8 @@ const EditorPage = () => {
       // Join the room
       socketRef.current.emit('join-room', { 
         roomId, 
-        username 
+        username,
+        token // Pass the token for authentication
       });
       
       console.log('Joined room:', roomId, 'as', username);

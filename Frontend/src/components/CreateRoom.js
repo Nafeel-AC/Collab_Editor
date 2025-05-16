@@ -21,10 +21,20 @@ const CreateRoom = () => {
     try {
       console.log("Creating room with username:", username);
       
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.error("No authentication token found");
+        setError('Authentication required. Please log in again.');
+        return;
+      }
+      
       const response = await fetch(`${API_BASE_URL}/api/rooms/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         credentials: 'include',
         body: JSON.stringify({
