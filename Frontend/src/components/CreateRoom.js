@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Code2 } from 'lucide-react';
+import { API_BASE_URL } from '../config/api.config';
 
 const CreateRoom = () => {
   const [roomId, setRoomId] = useState('');
@@ -20,7 +21,7 @@ const CreateRoom = () => {
     try {
       console.log("Creating room with username:", username);
       
-      const response = await fetch('http://localhost:3050/api/rooms/create', {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,4 +136,4 @@ const CreateRoom = () => {
   );
 };
 
-export default CreateRoom; 
+export default CreateRoom;

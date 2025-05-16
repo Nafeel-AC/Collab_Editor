@@ -8,6 +8,7 @@ import Footer from "./Footer";
 import { LogOut, User, ChevronDown } from "lucide-react";
 import { TypewriterEffectSmooth } from "./TypewriterEffect";
 import axios from "axios";
+import { API_BASE_URL, getImageUrl } from '../config/api.config';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ export default function LandingPage() {
       // Fetch user profile data to get the profile picture
       const fetchUserProfile = async () => {
         try {
-          const response = await axios.get(`http://localhost:3050/api/users/me`, {
+          const response = await axios.get(`${API_BASE_URL}/api/users/me`, {
             headers: {
               Authorization: `Bearer ${token}`
             },
@@ -38,7 +39,7 @@ export default function LandingPage() {
           // Process profile picture URL
           let profileData = response.data;
           if (profileData.profilePic && !profileData.profilePic.startsWith('http')) {
-            profileData.profilePic = `http://localhost:3050${profileData.profilePic}`;
+            profileData.profilePic = getImageUrl(profileData.profilePic);
           }
           
           setUserProfile(profileData);
