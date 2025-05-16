@@ -22,7 +22,13 @@ const PORT = process.env.PORT || 3050; // Make sure port matches frontend
 console.log("Initializing Socket.IO server...");
 const io = new Server(server, {
     cors: {
-        origin: ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"],
+        origin: [
+            "http://localhost:3000", 
+            "http://127.0.0.1:3000", 
+            "http://localhost:5173",
+            "https://codesync-lake.vercel.app",
+            process.env.FRONTEND_URL || "https://collab-editor-frontend.vercel.app" // Add your Vercel frontend URL here
+        ],
         methods: ["GET", "POST"],
         credentials: true,
         allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
