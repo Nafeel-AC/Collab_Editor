@@ -5,6 +5,7 @@ import io from 'socket.io-client';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { showSuccess, showError } from '../utils/alertUtils';
+import { API_BASE_URL, getImageUrl } from '../config/api.config';
 
 // Add a style element to force dark theme globally with bluish glow effects
 const darkModeStyle = `
@@ -104,7 +105,7 @@ function Dashboard() {
       // Get userId from localStorage if available, or from API
       const getCurrentUserId = async () => {
         try {
-          const response = await fetch('http://localhost:3050/api/users/me', {
+          const response = await fetch(`${API_BASE_URL}/api/users/me`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`
@@ -162,7 +163,7 @@ function Dashboard() {
       }
       
       // Force polling first to handle WebSocket issues
-      const newSocket = io('http://localhost:3050', {
+      const newSocket = io(API_BASE_URL, {
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,
         timeout: 20000,
@@ -385,7 +386,7 @@ function Dashboard() {
     // Verify token validity by making a request to get user data
     const verifyToken = async () => {
       try {
-        const response = await fetch('http://localhost:3050/api/users/friends', {
+        const response = await fetch(`${API_BASE_URL}/api/users/friends`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -426,7 +427,7 @@ function Dashboard() {
       setLoading(true);
       try {
         // Fetch friends
-        const friendsResponse = await fetch('http://localhost:3050/api/users/friends', {
+        const friendsResponse = await fetch(`${API_BASE_URL}/api/users/friends`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -449,7 +450,7 @@ function Dashboard() {
                 if (friend.profilePic) {
                   // Handle server-side uploaded images
                   if (friend.profilePic.startsWith('/uploads/')) {
-                    profilePicUrl = `http://localhost:3050${friend.profilePic}`;
+                    profilePicUrl = getImageUrl(friend.profilePic);
                     console.log('Using server uploaded profile picture:', profilePicUrl);
                   } 
                   // Handle fully qualified URLs (already starting with http)
@@ -459,12 +460,12 @@ function Dashboard() {
                   }
                   // Handle partial paths that need server prefix
                   else {
-                    profilePicUrl = `http://localhost:3050${friend.profilePic.startsWith('/') ? '' : '/'}${friend.profilePic}`;
+                    profilePicUrl = getImageUrl(friend.profilePic);
                     console.log('Using prefixed profile picture:', profilePicUrl);
                   }
                 } else {
                   // Fallback to UI Avatars
-                  profilePicUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || 'Unknown')}&background=random`;
+                  profilePicUrl = getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || 'Unknown')}&background=random`);
                   console.log('Using UI Avatars fallback:', profilePicUrl);
                 }
                 
@@ -495,7 +496,7 @@ function Dashboard() {
         }
         
         // Fetch friend requests
-        const requestsResponse = await fetch('http://localhost:3050/api/users/friend-requests', {
+        const requestsResponse = await fetch(`${API_BASE_URL}/api/users/friend-requests`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -516,7 +517,7 @@ function Dashboard() {
                 if (user.profilePic) {
                   // Handle server-side uploaded images
                   if (user.profilePic.startsWith('/uploads/')) {
-                    profilePicUrl = `http://localhost:3050${user.profilePic}`;
+                    profilePicUrl = getImageUrl(user.profilePic);
                   } 
                   // Handle fully qualified URLs (already starting with http)
                   else if (user.profilePic.startsWith('http')) {
@@ -524,11 +525,11 @@ function Dashboard() {
                   }
                   // Handle partial paths that need server prefix
                   else {
-                    profilePicUrl = `http://localhost:3050${user.profilePic.startsWith('/') ? '' : '/'}${user.profilePic}`;
+                    profilePicUrl = getImageUrl(user.profilePic);
                   }
                 } else {
                   // Fallback to UI Avatars
-                  profilePicUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName || 'Unknown')}&background=random`;
+                  profilePicUrl = getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName || 'Unknown')}&background=random`);
                 }
                 
                 return {
@@ -554,7 +555,7 @@ function Dashboard() {
         }
         
         // Fetch all users (for sending friend requests)
-        const usersResponse = await fetch('http://localhost:3050/api/users/all', {
+        const usersResponse = await fetch(`${API_BASE_URL}/api/users/all`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -573,7 +574,7 @@ function Dashboard() {
                 if (user.profilePic) {
                   // Handle server-side uploaded images
                   if (user.profilePic.startsWith('/uploads/')) {
-                    profilePicUrl = `http://localhost:3050${user.profilePic}`;
+                    profilePicUrl = getImageUrl(user.profilePic);
                   } 
                   // Handle fully qualified URLs (already starting with http)
                   else if (user.profilePic.startsWith('http')) {
@@ -581,11 +582,11 @@ function Dashboard() {
                   }
                   // Handle partial paths that need server prefix
                   else {
-                    profilePicUrl = `http://localhost:3050${user.profilePic.startsWith('/') ? '' : '/'}${user.profilePic}`;
+                    profilePicUrl = getImageUrl(user.profilePic);
                   }
                 } else {
                   // Fallback to UI Avatars
-                  profilePicUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName || 'Unknown')}&background=random`;
+                  profilePicUrl = getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName || 'Unknown')}&background=random`);
                 }
                 
                 return {
@@ -635,7 +636,7 @@ function Dashboard() {
       console.log("Refreshing friend requests");
       setLoading(true);
 
-      const refreshResponse = await fetch('http://localhost:3050/api/users/friend-requests', {
+      const refreshResponse = await fetch(`${API_BASE_URL}/api/users/friend-requests`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -655,7 +656,7 @@ function Dashboard() {
               if (user.profilePic) {
                 // Handle server-side uploaded images
                 if (user.profilePic.startsWith('/uploads/')) {
-                  profilePicUrl = `http://localhost:3050${user.profilePic}`;
+                  profilePicUrl = getImageUrl(user.profilePic);
                 } 
                 // Handle fully qualified URLs (already starting with http)
                 else if (user.profilePic.startsWith('http')) {
@@ -663,11 +664,11 @@ function Dashboard() {
                 }
                 // Handle partial paths that need server prefix
                 else {
-                  profilePicUrl = `http://localhost:3050${user.profilePic.startsWith('/') ? '' : '/'}${user.profilePic}`;
+                  profilePicUrl = getImageUrl(user.profilePic);
                 }
               } else {
                 // Fallback to UI Avatars
-                profilePicUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName || 'Unknown')}&background=random`;
+                profilePicUrl = getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName || 'Unknown')}&background=random`);
               }
               
               return {
@@ -715,7 +716,7 @@ function Dashboard() {
       try {
         if (!token) return;
         
-        const response = await axios.get(`http://localhost:3050/api/users/me`, {
+        const response = await axios.get(`${API_BASE_URL}/api/users/me`, {
           headers: {
             Authorization: `Bearer ${token}`
           },
@@ -727,7 +728,7 @@ function Dashboard() {
         console.log("Raw profile data:", profileData);
         
         if (profileData.profilePic && !profileData.profilePic.startsWith('http')) {
-          profileData.profilePic = `http://localhost:3050${profileData.profilePic}`;
+          profileData.profilePic = getImageUrl(profileData.profilePic);
           console.log("Updated profile picture URL:", profileData.profilePic);
         } else if (profileData.profilePic) {
           console.log("Profile picture URL already has http:", profileData.profilePic);
@@ -751,7 +752,7 @@ function Dashboard() {
       setLoading(true);
       console.log(`Sending friend request to user with ID: ${userId}`);
       
-      const response = await fetch('http://localhost:3050/api/users/send-friend-request', {
+      const response = await fetch(`${API_BASE_URL}/api/users/send-friend-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -790,7 +791,7 @@ function Dashboard() {
       setLoading(true);
       console.log(`Accepting friend request from user with ID: ${requesterId}`);
       
-      const response = await fetch('http://localhost:3050/api/users/accept-friend-request', {
+      const response = await fetch(`${API_BASE_URL}/api/users/accept-friend-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -820,7 +821,7 @@ function Dashboard() {
             status: 'Online',
             online: true,
             avatar: responseData.requester.profilePic ? 
-              (responseData.requester.profilePic.startsWith('http') ? responseData.requester.profilePic : `http://localhost:3050${responseData.requester.profilePic}`) : 
+              (responseData.requester.profilePic.startsWith('http') ? responseData.requester.profilePic : getImageUrl(responseData.requester.profilePic)) : 
               `https://ui-avatars.com/api/?name=${responseData.requester.name}&background=random`
           }]);
         } else if (acceptedUser) {
@@ -848,7 +849,7 @@ function Dashboard() {
   // Handle rejecting friend request
   const handleRejectFriendRequest = async (requesterId) => {
     try {
-      const response = await fetch('http://localhost:3050/api/users/reject-friend-request', {
+      const response = await fetch(`${API_BASE_URL}/api/users/reject-friend-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -927,7 +928,7 @@ function Dashboard() {
         setLoading(true);
         console.log(`Fetching messages for friend ID: ${friendId}`);
         
-        const response = await fetch(`http://localhost:3050/api/messages/${friendId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/messages/${friendId}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -1120,7 +1121,7 @@ function Dashboard() {
       }
       
       // Call logout API
-      await fetch('http://localhost:3050/api/users/logout', {
+      await fetch(`${API_BASE_URL}/api/users/logout`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1181,7 +1182,7 @@ function Dashboard() {
             <div className="relative">
               <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-md"></div>
               <img 
-                src={userProfile?.profilePic || `https://ui-avatars.com/api/?name=${userName}&background=4D5DFE&color=fff`} 
+                src={userProfile?.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${userName}&background=4D5DFE&color=fff`)} 
                   alt={userName}
                 className="w-12 h-12 rounded-full object-cover relative z-10"
               />
@@ -1276,13 +1277,13 @@ function Dashboard() {
                               {/* Log the image source for debugging */}
                               {console.log('Friend image src:', friend.profilePic || friend.avatar)}
                               <img 
-                                src={friend.profilePic || friend.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`}
+                                src={friend.profilePic || friend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`)}
                                 alt={friend.userName || friend.name || 'User'} 
                                 className="w-10 h-10 rounded-full object-cover relative z-10"
                                 onError={(e) => {
                                   console.log('Image failed to load:', e.target.src);
                                   e.target.onerror = null;
-                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`;
+                                  e.target.src = getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`);
                                 }}
                               />
                             </div>
@@ -1319,7 +1320,7 @@ function Dashboard() {
                           <div className="relative">
                             <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
                             <img 
-                              src={user.profilePic || `https://ui-avatars.com/api/?name=${user.userName || 'User'}&background=4D5DFE&color=fff`} 
+                              src={user.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${user.userName || 'User'}&background=4D5DFE&color=fff`)} 
                               alt={user.userName || 'User'} 
                               className="w-10 h-10 rounded-full object-cover relative z-10"
                             />
@@ -1360,7 +1361,7 @@ function Dashboard() {
                           <div className="relative">
                             <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
                             <img 
-                              src={request.avatar || `https://ui-avatars.com/api/?name=${request.userName || request.name || 'User'}&background=4D5DFE&color=fff`} 
+                              src={request.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${request.userName || request.name || 'User'}&background=4D5DFE&color=fff`)} 
                               alt={request.userName || request.name || 'User'} 
                               className="w-10 h-10 rounded-full object-cover relative z-10"
                             />
@@ -1456,13 +1457,13 @@ function Dashboard() {
                 <div className="relative">
                   <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
                   <img 
-                    src={selectedFriend.profilePic || selectedFriend.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`} 
+                    src={selectedFriend.profilePic || selectedFriend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`)} 
                     alt={selectedFriend.userName || selectedFriend.name || 'User'} 
                     className="w-10 h-10 rounded-full object-cover relative z-10"
                     onError={(e) => {
                       console.log('Header image failed to load:', e.target.src);
                       e.target.onerror = null;
-                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`;
+                      e.target.src = getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`);
                     }}
                   />
                 </div>

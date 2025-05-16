@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import io from 'socket.io-client';
+import { API_BASE_URL } from '../config/api.config';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -61,7 +62,8 @@ const EditorPage = () => {
     console.log('Connecting to socket server...');
     
     // Connect to WebSocket server
-    socketRef.current = io('http://localhost:3050', {
+    socketRef.current = io(API_BASE_URL, {
+      withCredentials: true,
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
@@ -297,7 +299,7 @@ const EditorPage = () => {
     if (!fileId) return;
     
     try {
-      const response = await fetch(`http://localhost:3050/api/files/${fileId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -366,7 +368,7 @@ const EditorPage = () => {
     if (isUserLoggedIn) {
       try {
         // Check if the current user is the host
-        const roomResponse = await axios.get(`http://localhost:3050/api/rooms/${roomId}`, {
+        const roomResponse = await axios.get(`${API_BASE_URL}/api/rooms/${roomId}`, {
           headers: {
             Authorization: `Bearer ${token}`
           },
@@ -441,7 +443,7 @@ const EditorPage = () => {
         console.log('This room was loaded from project:', originalProjectId);
       }
       
-      const saveResponse = await axios.post(`http://localhost:3050/api/projects/save/${roomId}`, {
+      const saveResponse = await axios.post(`${API_BASE_URL}/api/projects/save/${roomId}`, {
         name: projectName,
         description: projectDescription || `Project created from room ${roomId}`,
         createdBy: savedUsername, // Add createdBy explicitly to ensure it matches
@@ -481,7 +483,7 @@ const EditorPage = () => {
     // First try to close room in the backend
     try {
       if (token) {
-        await axios.post(`http://localhost:3050/api/rooms/${roomId}/close`, {}, {
+        await axios.post(`${API_BASE_URL}/api/rooms/${roomId}/close`, {}, {
           headers: {
             Authorization: `Bearer ${token}`
           },
@@ -511,7 +513,7 @@ const EditorPage = () => {
         try {
           const token = localStorage.getItem('token');
           if (token) {
-            await axios.post(`http://localhost:3050/api/rooms/${roomId}/close`, {}, {
+            await axios.post(`${API_BASE_URL}/api/rooms/${roomId}/close`, {}, {
               headers: {
                 Authorization: `Bearer ${token}`
               },

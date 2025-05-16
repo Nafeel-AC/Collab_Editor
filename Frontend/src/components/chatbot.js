@@ -20,6 +20,7 @@ import {
   PanelRight,
   ArrowLeft,
 } from "lucide-react"
+import { API_BASE_URL } from '../config/api.config'
 
 // Register the language with highlight.js
 hljs.registerLanguage("javascript", javascript)
@@ -198,7 +199,7 @@ export default function ChatbotPage() {
         console.log("Fetching conversations from server with token");
         
         // First, get list of conversations (without messages)
-        const response = await fetch("http://localhost:3050/api/chat/conversations", {
+        const response = await fetch(`${API_BASE_URL}/api/chat/conversations`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -282,7 +283,7 @@ export default function ChatbotPage() {
       
       console.log(`Loading conversation ${conversationId} from server`);
       
-      const response = await fetch(`http://localhost:3050/api/chat/conversations/${conversationId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${conversationId}`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -385,7 +386,7 @@ export default function ChatbotPage() {
     if (token) {
       console.log("Creating new conversation on server");
       // Create conversation on the server
-      fetch("http://localhost:3050/api/chat/conversations", {
+      fetch(`${API_BASE_URL}/api/chat/conversations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -483,7 +484,7 @@ export default function ChatbotPage() {
         const updateTitle = async () => {
           try {
             // First try with PATCH
-            const response = await fetch(`http://localhost:3050/api/chat/conversations/${activeConversation}/title`, {
+            const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${activeConversation}/title`, {
               method: "PATCH",
               headers: {
                 "Content-Type": "application/json",
@@ -495,7 +496,7 @@ export default function ChatbotPage() {
             if (!response.ok) {
               console.log("PATCH failed, trying PUT method instead");
               // If PATCH fails, try PUT
-              const putResponse = await fetch(`http://localhost:3050/api/chat/conversations/${activeConversation}/title`, {
+              const putResponse = await fetch(`${API_BASE_URL}/api/chat/conversations/${activeConversation}/title`, {
                 method: "PUT",
                 headers: {
                   "Content-Type": "application/json",
@@ -538,7 +539,7 @@ export default function ChatbotPage() {
       try {
         console.log(`Loading conversation ${id} from server`);
         
-        const response = await fetch(`http://localhost:3050/api/chat/conversations/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${id}`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -594,7 +595,7 @@ export default function ChatbotPage() {
     // Delete from server if user is authenticated
     const token = localStorage.getItem("token");
     if (token) {
-      fetch(`http://localhost:3050/api/chat/conversations/${id}`, {
+      fetch(`${API_BASE_URL}/api/chat/conversations/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`
@@ -664,7 +665,7 @@ export default function ChatbotPage() {
       console.log("Using conversation ID:", activeConversation);
       
       // Make API call to chat API
-      const response = await fetch("http://localhost:3050/api/chat", {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -791,7 +792,7 @@ export default function ChatbotPage() {
           const updateTitle = async () => {
             try {
               // First try with PATCH
-              const response = await fetch(`http://localhost:3050/api/chat/conversations/${activeConversation}/title`, {
+              const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${activeConversation}/title`, {
                 method: "PATCH",
                 headers: {
                   "Content-Type": "application/json",
@@ -803,7 +804,7 @@ export default function ChatbotPage() {
               if (!response.ok) {
                 console.log("PATCH failed for auto-title, trying PUT method instead");
                 // If PATCH fails, try PUT
-                const putResponse = await fetch(`http://localhost:3050/api/chat/conversations/${activeConversation}/title`, {
+                const putResponse = await fetch(`${API_BASE_URL}/api/chat/conversations/${activeConversation}/title`, {
                   method: "PUT",
                   headers: {
                     "Content-Type": "application/json",

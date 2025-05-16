@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react';
+import { API_BASE_URL } from '../config/api.config';
 
 const SignupPage = () => {
   const navigate = useNavigate();
@@ -97,7 +98,7 @@ const SignupPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:3050/api/users/signup', {
+      const response = await axios.post(`${API_BASE_URL}/api/users/signup`, {
         userName: formData.userName,
         email: formData.email,
         password: formData.password

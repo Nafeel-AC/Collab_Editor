@@ -21,6 +21,7 @@ import { Link } from "react-router-dom"
 import axios from "axios"
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
 import "../Fonts/WinkingRough.css" // Import the local font CSS
+import { API_BASE_URL } from '../config/api.config'
 
 // Custom styles for animations
 const taskAnimationStyles = `
@@ -53,7 +54,7 @@ const taskAnimationStyles = `
 `;
 
 // Update to the correct port where the backend server is running
-const API_URL = "http://localhost:3050/api"
+const API_URL = `${API_BASE_URL}/api`
 
 // Configure axios defaults for CORS
 axios.defaults.withCredentials = true

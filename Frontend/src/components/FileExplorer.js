@@ -17,6 +17,7 @@ import {
   FolderPlus
 } from 'lucide-react';
 import { showError, showSuccess, showWarning, showConfirm } from '../utils/alertUtils';
+import { API_BASE_URL } from '../config/api.config';
 
 // Helper to determine icon based on file extension
 const getFileIcon = (fileName) => {
@@ -91,7 +92,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
   const fetchFiles = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3050/api/files/room/${roomId}`);
+      const response = await fetch(`${API_BASE_URL}/api/files/room/${roomId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch files');
@@ -120,7 +121,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
   // Initialize files if room is empty
   const initializeFiles = async () => {
     try {
-      const response = await fetch(`http://localhost:3050/api/files/initialize/${roomId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/files/initialize/${roomId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,7 +211,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
       const newItemPath = parentPath ? 
         `${parentPath}/${newItemName}` : newItemName;
       
-      const response = await fetch('http://localhost:3050/api/files/create', {
+      const response = await fetch(`${API_BASE_URL}/api/files/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -302,7 +303,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
     if (!newName.trim() || !renamingItem) return;
     
     try {
-      const response = await fetch(`http://localhost:3050/api/files/${renamingItem}/rename`, {
+      const response = await fetch(`${API_BASE_URL}/api/files/${renamingItem}/rename`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -364,7 +365,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
         return;
       }
       
-      const response = await fetch(`http://localhost:3050/api/files/${fileId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
         method: 'DELETE',
       });
       

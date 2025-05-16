@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
+import { API_BASE_URL } from '../config/api.config';
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -38,15 +39,9 @@ const LoginPage = () => {
     setIsLoading(true);
     
     try {
-      // Configure axios to include credentials
-      const response = await axios.post("http://localhost:3050/api/users/login", {
+      const response = await axios.post(`${API_BASE_URL}/api/users/login`, {
         email,
-        password
-      }, {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        password,
       });
 
       console.log("Login response:", response.data);
