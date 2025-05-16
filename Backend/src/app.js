@@ -7,7 +7,13 @@ const app = express();
 
 // set middlewares for the server
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173'], // Allow specific origins for better security
+  origin: [
+    'http://localhost:3000', 
+    'http://127.0.0.1:3000', 
+    'http://localhost:5173',
+    'https://collab-editor-ruddy.vercel.app',
+    process.env.FRONTEND_URL
+  ].filter(Boolean),
   credentials: true, // Allow cookies to be sent
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
