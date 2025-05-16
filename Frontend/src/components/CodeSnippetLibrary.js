@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Plus, Search, X, Edit, Trash, Code, Bookmark, Tag, Filter } from 'lucide-react';
+import { API_BASE_URL } from '../config/api.config.js';
 
 const CodeSnippetLibrary = ({ isOpen, onClose, token, roomId, onInsertSnippet }) => {
   const [snippets, setSnippets] = useState([]);
@@ -62,7 +63,7 @@ const CodeSnippetLibrary = ({ isOpen, onClose, token, roomId, onInsertSnippet })
       setError(null);
       
       // Example API call to fetch snippets
-      const response = await fetch(`http://localhost:3050/api/snippets/${roomId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/snippets/${roomId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -176,7 +177,7 @@ const CodeSnippetLibrary = ({ isOpen, onClose, token, roomId, onInsertSnippet })
       // In production, you would make an API call to save the snippet
       // Example API call:
       /*
-      const response = await fetch('http://localhost:3050/api/snippets', {
+      const response = await fetch(`${API_BASE_URL}/api/snippets`, {
         method: editingSnippet ? 'PUT' : 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -222,7 +223,7 @@ const CodeSnippetLibrary = ({ isOpen, onClose, token, roomId, onInsertSnippet })
       // In production, you would make an API call to delete the snippet
       // Example API call:
       /*
-      const response = await fetch(`http://localhost:3050/api/snippets/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/snippets/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

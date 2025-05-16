@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, X, Loader2, Send } from 'lucide-react';
+import { API_BASE_URL } from '../config/api.config.js';
 
 // Add a style element to force dark theme globally with bluish glow effects for terminal
 const terminalDarkModeStyle = `
@@ -164,7 +165,7 @@ ${code}
 `;
 
       // Send the code to the backend for execution with Gemini
-      const response = await fetch('http://localhost:3050/api/execute', {
+      const response = await fetch(`${API_BASE_URL}/api/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -231,7 +232,7 @@ ${code}
     try {
       // If we have a real execution ID from backend
       if (executionId && !executionId.startsWith('local_')) {
-        const response = await fetch('http://localhost:3050/api/execute', {
+        const response = await fetch(`${API_BASE_URL}/api/execute`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

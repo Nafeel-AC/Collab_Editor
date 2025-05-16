@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://collabeditor-production-51a9.up.railway.app';
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://collabeditor-production-51a9.up.railway.app';
 
 // For local development, uncomment the line below and comment the line above
 // const API_BASE_URL = 'http://localhost:3050';

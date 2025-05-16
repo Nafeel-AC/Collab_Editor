@@ -4,6 +4,7 @@ import { FolderOpen, Trash2, Calendar, Plus, Search, ChevronLeft } from 'lucide-
 import axios from 'axios';
 import { showSuccess, showError } from '../utils/alertUtils';
 import Squares from './Squares';
+import { API_BASE_URL } from '../config/api.config.js';
 
 const ProjectsPage = () => {
   const [projects, setProjects] = useState([]);
@@ -29,7 +30,7 @@ const ProjectsPage = () => {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:3050/api/projects', {
+      const response = await axios.get(`${API_BASE_URL}/api/projects`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -49,7 +50,7 @@ const ProjectsPage = () => {
   const handleLoadProject = async (projectId) => {
     try {
       setLoading(true);
-      const response = await axios.post(`http://localhost:3050/api/projects/load/${projectId}`, {}, {
+      const response = await axios.post(`${API_BASE_URL}/api/projects/load/${projectId}`, {}, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -84,7 +85,7 @@ const ProjectsPage = () => {
     
     try {
       setLoading(true);
-      await axios.delete(`http://localhost:3050/api/projects/${projectId}`, {
+      await axios.delete(`${API_BASE_URL}/api/projects/${projectId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         },

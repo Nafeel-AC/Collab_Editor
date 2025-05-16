@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Edit, Save, User, MapPin, GithubIcon, LinkedinIcon, TwitterIcon, Mail, Phone, Calendar, ArrowLeft, MailIcon, Code, Settings, Upload, Camera, MessageCircle, AlertCircle, Users, Trash2, Shield, Layers, Monitor, MoreHorizontal, Filter, Search, RefreshCw, UserX, X } from 'lucide-react';
+import { API_BASE_URL } from '../config/api.config.js';
 
 // Add a style element to force dark theme globally
 const darkModeStyle = `
@@ -117,7 +118,7 @@ const ProfilePage = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      const response = await axios.get('http://localhost:3050/api/messages/unread', {
+      const response = await axios.get(`${API_BASE_URL}/api/messages/unread`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -164,7 +165,7 @@ const ProfilePage = () => {
       }
       
       console.log('Making request to get all users');
-      const response = await axios.get('http://localhost:3050/api/users/all-users', {
+      const response = await axios.get(`${API_BASE_URL}/api/users/all-users`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -222,7 +223,7 @@ const ProfilePage = () => {
       }
       
       console.log('Making request to get active rooms');
-      const response = await axios.get('http://localhost:3050/api/rooms/active', {
+      const response = await axios.get(`${API_BASE_URL}/api/rooms/active`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -294,7 +295,7 @@ const ProfilePage = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      await axios.delete(`http://localhost:3050/api/users/${userId}`, {
+      await axios.delete(`${API_BASE_URL}/api/users/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -320,7 +321,7 @@ const ProfilePage = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      await axios.put(`http://localhost:3050/api/users/${userId}/admin`, 
+      await axios.put(`${API_BASE_URL}/api/users/${userId}/admin`, 
         { isAdmin: !currentStatus },
         {
           headers: {
@@ -373,7 +374,7 @@ const ProfilePage = () => {
           return;
         }
         
-        const response = await axios.get(`http://localhost:3050/api/users/me`, {
+        const response = await axios.get(`${API_BASE_URL}/api/users/me`, {
           headers: {
             Authorization: `Bearer ${token}`
           },
@@ -387,7 +388,7 @@ const ProfilePage = () => {
         // Ensure profile picture URL is properly formatted
         let profilePicUrl = response.data.profilePic;
         if (profilePicUrl && !profilePicUrl.startsWith('http')) {
-          profilePicUrl = `http://localhost:3050${profilePicUrl}`;
+          profilePicUrl = `${API_BASE_URL}${profilePicUrl}`;
         }
         
         const userData = {
@@ -492,7 +493,7 @@ const ProfilePage = () => {
       const uploadFormData = new FormData();
       uploadFormData.append('profilePic', selectedFile);
       
-      const response = await axios.post(`http://localhost:3050/api/users/profile-picture`, uploadFormData, {
+      const response = await axios.post(`${API_BASE_URL}/api/users/profile-picture`, uploadFormData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -531,6 +532,8 @@ const ProfilePage = () => {
       console.error('Error uploading profile picture:', err);
       alert('Failed to upload profile picture: ' + (err.response?.data?.error || err.message));
       return false;
+    } finally {
+      // ... existing code ...
     }
   };
   
@@ -570,9 +573,10 @@ const ProfilePage = () => {
         }
       }
       
-      const response = await axios.put(`http://localhost:3050/api/users/profile`, formData, {
+      const response = await axios.put(`${API_BASE_URL}/api/users/profile`, formData, {
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
         withCredentials: true
       });
@@ -580,9 +584,9 @@ const ProfilePage = () => {
       console.log('Profile update response:', response.data);
       
       // Ensure profile picture URL is properly formatted
-      let profilePicUrl = response.data.profilePic;
+      let profilePicUrl = response.data.user.profilePic;
       if (profilePicUrl && !profilePicUrl.startsWith('http')) {
-        profilePicUrl = `http://localhost:3050${profilePicUrl}`;
+        profilePicUrl = `${API_BASE_URL}${profilePicUrl}`;
       }
       
       const userData = {
@@ -607,7 +611,7 @@ const ProfilePage = () => {
     try {
       const token = localStorage.getItem('token');
       
-      await axios.put(`http://localhost:3050/api/users/theme`, { theme: newTheme }, {
+      await axios.put(`${API_BASE_URL}/api/users/theme`, { theme: newTheme }, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -640,7 +644,7 @@ const ProfilePage = () => {
     try {
       const token = localStorage.getItem('token');
       
-      await axios.post(`http://localhost:3050/api/messages/mark-read/${messageId}`, {}, {
+      await axios.post(`${API_BASE_URL}/api/messages/mark-read/${messageId}`, {}, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -659,7 +663,7 @@ const ProfilePage = () => {
     try {
       const token = localStorage.getItem('token');
       
-      await axios.post(`http://localhost:3050/api/messages/mark-all-read`, {}, {
+      await axios.post(`${API_BASE_URL}/api/messages/mark-all-read`, {}, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -818,7 +822,7 @@ const ProfilePage = () => {
                               <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/5 blur-sm"></div>
                               {user.profilePic ? (
                                 <img 
-                                  src={user.profilePic.startsWith('http') ? user.profilePic : `http://localhost:3050${user.profilePic}`} 
+                                  src={user.profilePic.startsWith('http') ? user.profilePic : `${API_BASE_URL}${user.profilePic}`} 
                                   alt={user.userName} 
                                   className="h-8 w-8 rounded-full object-cover relative z-10"
                                 />
@@ -904,7 +908,7 @@ const ProfilePage = () => {
                       const token = localStorage.getItem('token');
                       if (!token) return;
                       
-                      const response = await axios.post('http://localhost:3050/api/rooms/cleanup', {}, {
+                      const response = await axios.post(`${API_BASE_URL}/api/rooms/cleanup`, {}, {
                         headers: {
                           Authorization: `Bearer ${token}`
                         },
@@ -954,7 +958,7 @@ const ProfilePage = () => {
                         const token = localStorage.getItem('token');
                         if (!token) return;
                         
-                        const response = await axios.post('http://localhost:3050/api/rooms/cleanup', {}, {
+                        const response = await axios.post(`${API_BASE_URL}/api/rooms/cleanup`, {}, {
                           headers: {
                             Authorization: `Bearer ${token}`
                           },
@@ -1005,7 +1009,7 @@ const ProfilePage = () => {
                             try {
                               if (!window.confirm(`Close room ${room.roomId}?`)) return;
                               const token = localStorage.getItem('token');
-                              await axios.post(`http://localhost:3050/api/rooms/${room.roomId}/close`, {}, {
+                              await axios.post(`${API_BASE_URL}/api/rooms/${room.roomId}/close`, {}, {
                                 headers: { Authorization: `Bearer ${token}` },
                                 withCredentials: true
                               });
@@ -1090,7 +1094,7 @@ const ProfilePage = () => {
           if (!token) return;
           
           // Silently run cleanup
-          const response = await axios.post('http://localhost:3050/api/rooms/cleanup', {}, {
+          const response = await axios.post(`${API_BASE_URL}/api/rooms/cleanup`, {}, {
             headers: {
               Authorization: `Bearer ${token}`
             },
