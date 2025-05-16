@@ -49,9 +49,21 @@ const ProfileImageWithFallback = ({ src, userName, className }) => {
   const [hasError, setHasError] = useState(false);
   
   useEffect(() => {
-    setImgSrc(src);
-    setHasError(false);
-  }, [src]);
+    // Filter out localhost URLs which won't work in production
+    if (src && (src.includes('localhost') || src.includes('127.0.0.1'))) {
+      console.warn("Detected local URL which won't work in production:", src);
+      setHasError(true);
+      setImgSrc(`https://ui-avatars.com/api/?name=${encodeURIComponent(userName || 'User')}&background=random&size=200`);
+    } else if (src) {
+      setImgSrc(src);
+      setHasError(false);
+    } else {
+      // If no source provided, use the avatar API
+      console.warn("No profile image source provided");
+      setHasError(true);
+      setImgSrc(`https://ui-avatars.com/api/?name=${encodeURIComponent(userName || 'User')}&background=random&size=200`);
+    }
+  }, [src, userName]);
   
   const handleError = () => {
     if (!hasError) {
@@ -83,6 +95,7 @@ const ProfilePage = () => {
   const [previewUrl, setPreviewUrl] = useState('');
   const [unreadMessages, setUnreadMessages] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [needsProfilePicMigration, setNeedsProfilePicMigration] = useState(false);
   
   // Admin-specific states
   const [allUsers, setAllUsers] = useState([]);
@@ -1174,6 +1187,50 @@ const ProfilePage = () => {
     }
   }, [user, adminView]); // Re-run effect when user or adminView changes
   
+  // Check if profile picture needs migration
+  useEffect(() => {
+    const checkProfileMigration = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await axios.get(`${API_BASE_URL}/api/users/check-profile-migration`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          withCredentials: true
+        });
+        
+        if (response.data.needsMigration) {
+          console.log('Profile picture needs migration');
+          setNeedsProfilePicMigration(true);
+        }
+      } catch (err) {
+        console.error('Error checking profile migration:', err);
+      }
+    };
+    
+    checkProfileMigration();
+  }, []);
+  
+  // Migration notification component
+  const ProfileMigrationNotice = () => {
+    if (!needsProfilePicMigration) return null;
+    
+    return (
+      <div className="bg-orange-500/20 border border-orange-500 rounded-lg p-4 mb-6 text-white">
+        <h3 className="text-lg font-semibold mb-2">Profile Picture Update Required</h3>
+        <p className="mb-3">Your profile picture needs to be updated for compatibility with our cloud storage system.</p>
+        <button
+          onClick={() => setEditMode(true)}
+          className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md transition-colors"
+        >
+          Update Now
+        </button>
+      </div>
+    );
+  };
+  
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#0F0F13]">
@@ -1235,6 +1292,16 @@ const ProfilePage = () => {
           </div>
         </div>
       </header>
+      
+      {/* Main content */}
+      {error && (
+        <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 mx-auto max-w-7xl mt-6 text-white">
+          <p>{error}</p>
+        </div>
+      )}
+      
+      {/* Profile Migration Notice */}
+      {!loading && user && <ProfileMigrationNotice />}
       
       {/* Delete Confirmation Modal */}
       {renderDeleteConfirmation()}

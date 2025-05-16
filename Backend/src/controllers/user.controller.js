@@ -476,6 +476,15 @@ const getCurrentUser = async (req, res) => {
             return res.status(404).json({ error: "User not found" });
         }
         
+        // Fix profile picture URL if it's a local URL
+        if (user.profilePic && user.profilePic.includes('localhost')) {
+            console.log('Detected local profile picture URL:', user.profilePic);
+            // Return the user but with a flag indicating the profile pic needs migration
+            user.profilePic = null;
+            user._doc.needsProfilePicMigration = true;
+        }
+        
+        console.log('Returning user data with profilePic:', user.profilePic);
         return res.status(200).json(user);
     } catch (error) {
         console.error("Error getting current user:", error);
@@ -688,6 +697,38 @@ const uploadProfilePicture = async (req, res) => {
     }
 };
 
+// Check if user needs profile picture migration
+const checkProfilePicMigration = async (req, res) => {
+    try {
+        const userId = req.userId;
+        
+        if (!userId) {
+            return res.status(401).json({ error: "Not authenticated" });
+        }
+        
+        const user = await User.findById(userId).select('profilePic');
+        
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        // Check if the profile picture URL is a local URL
+        const needsMigration = user.profilePic && (
+            user.profilePic.includes('localhost') || 
+            user.profilePic.includes('127.0.0.1') ||
+            user.profilePic.startsWith('/uploads/')
+        );
+        
+        return res.status(200).json({ 
+            needsMigration,
+            currentUrl: user.profilePic
+        });
+    } catch (error) {
+        console.error("Error checking profile picture migration:", error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 // Get all registered users (admin only)
 const getAllRegisteredUsers = async (req, res) => {
     try {
@@ -801,5 +842,6 @@ export {
     uploadProfilePicture,
     getAllRegisteredUsers,
     deleteUser,
-    toggleAdminStatus
+    toggleAdminStatus,
+    checkProfilePicMigration
 };

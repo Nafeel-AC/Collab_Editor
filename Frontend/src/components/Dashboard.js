@@ -727,13 +727,21 @@ function Dashboard() {
         let profileData = response.data;
         console.log("Raw profile data:", profileData);
         
-        // With Cloudinary, URLs should be complete HTTP/HTTPS URLs
-        if (profileData.profilePic) {
-          console.log("Profile picture URL:", profileData.profilePic);
+        // Check for invalid profile picture URLs (localhost or migration needed)
+        if (profileData.profilePic && (profileData.profilePic.includes('localhost') || profileData.profilePic.includes('127.0.0.1'))) {
+          console.warn("Detected local profile picture URL that won't work in production:", profileData.profilePic);
+          profileData.profilePic = null;
+        } else if (profileData.needsProfilePicMigration) {
+          console.warn("User profile picture needs migration");
+          profileData.profilePic = null;
+        }
+        
+        // Set default avatar if no profile pic is available
+        if (!profileData.profilePic) {
+          console.log("Setting default avatar");
+          profileData.profilePic = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.userName || 'User')}&background=random`;
         } else {
-          console.log("No profile picture found in user data");
-          // Set a default avatar if no profile pic is available
-          profileData.profilePic = `https://ui-avatars.com/api/?name=${profileData.userName || 'User'}&background=random`;
+          console.log("Using profile picture URL:", profileData.profilePic);
         }
         
         setUserProfile(profileData);

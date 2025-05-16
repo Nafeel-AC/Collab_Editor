@@ -18,10 +18,11 @@ import {
     uploadProfilePicture,
     deleteUser,
     toggleAdminStatus,
-    getAllRegisteredUsers
+    getAllRegisteredUsers,
+    checkProfilePicMigration
 } from "../controllers/user.controller.js";
 import { verifyToken, isAdmin } from "../middlewares/auth.middleware.js";
-import upload from "../middlewares/upload.middleware.js";
+import loggingUpload from "../middlewares/upload.middleware.js";
 const router = Router();
 
 router.route("/login-confirmation").post(loginConfirmation);
@@ -49,7 +50,8 @@ router.route("/me").get(verifyToken, getCurrentUser);
 // Profile routes
 router.route("/profile").put(verifyToken, updateProfile);
 router.route("/theme").put(verifyToken, updateTheme);
-router.route("/profile-picture").post(verifyToken, upload.single('profilePic'), uploadProfilePicture);
+router.route("/profile-picture").post(verifyToken, loggingUpload.single('profilePic'), uploadProfilePicture);
+router.route("/check-profile-migration").get(verifyToken, checkProfilePicMigration);
 
 // Get all users (for normal users - excludes friends and friend requests)
 router.route("/all").get(verifyToken, getAllUsers);
