@@ -1,6 +1,7 @@
 // controller for handling request from user
 import {User} from "../models/user.model.js";
 import jwt from "jsonwebtoken";
+import { uploadToCloudinary } from '../config/cloudinary.config.js';
 
 
 async function loginConfirmation(req, res) {
@@ -628,10 +629,17 @@ const uploadProfilePicture = async (req, res) => {
             return res.status(400).json({ error: "No file uploaded" });
         }
         
-        // Get the URL path that will be used to access the file
-        const fileUrl = `/uploads/${req.file.filename}`;
+        // Upload to Cloudinary instead of storing locally
+        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+            folder: 'profile_pictures',
+            public_id: `user_${userId}_${Date.now()}`,
+            overwrite: true
+        });
         
-        // Update the user's profile with the new picture URL
+        // The secure_url is the HTTPS URL of the uploaded image
+        const fileUrl = cloudinaryResult.secure_url;
+        
+        // Update the user's profile with the new picture URL from Cloudinary
         const updatedUser = await User.findByIdAndUpdate(
             userId,
             { profilePic: fileUrl },

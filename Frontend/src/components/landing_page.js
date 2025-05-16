@@ -39,9 +39,11 @@ export default function LandingPage() {
           // Process profile picture URL
           let profileData = response.data;
           if (profileData.profilePic) {
-            // Use the getImageUrl helper function to properly format the URL
-            profileData.profilePic = getImageUrl(profileData.profilePic);
-            console.log("Updated profile picture URL:", profileData.profilePic);
+            // Using Cloudinary, URLs should be complete HTTP/HTTPS URLs already
+            console.log("Profile picture URL:", profileData.profilePic);
+          } else {
+            // Set a default avatar if no profile pic is available
+            profileData.profilePic = `https://ui-avatars.com/api/?name=${profileData.userName || 'User'}&background=random`;
           }
           
           setUserProfile(profileData);
@@ -169,7 +171,7 @@ export default function LandingPage() {
                   ) : (
                     <div className="h-10 w-10 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center shadow-md shadow-cyan-500/20">
                       <User size={20} className="text-white" />
-                  </div>
+                    </div>
                   )}
                   <span className="font-medium">{userName}</span>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />

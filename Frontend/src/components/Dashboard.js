@@ -727,13 +727,13 @@ function Dashboard() {
         let profileData = response.data;
         console.log("Raw profile data:", profileData);
         
-        if (profileData.profilePic && !profileData.profilePic.startsWith('http')) {
-          profileData.profilePic = getImageUrl(profileData.profilePic);
-          console.log("Updated profile picture URL:", profileData.profilePic);
-        } else if (profileData.profilePic) {
-          console.log("Profile picture URL already has http:", profileData.profilePic);
+        // With Cloudinary, URLs should be complete HTTP/HTTPS URLs
+        if (profileData.profilePic) {
+          console.log("Profile picture URL:", profileData.profilePic);
         } else {
           console.log("No profile picture found in user data");
+          // Set a default avatar if no profile pic is available
+          profileData.profilePic = `https://ui-avatars.com/api/?name=${profileData.userName || 'User'}&background=random`;
         }
         
         setUserProfile(profileData);
@@ -820,8 +820,7 @@ function Dashboard() {
             name: responseData.requester.name,
             status: 'Online',
             online: true,
-            avatar: responseData.requester.profilePic ? 
-              (responseData.requester.profilePic.startsWith('http') ? responseData.requester.profilePic : getImageUrl(responseData.requester.profilePic)) : 
+            avatar: responseData.requester.profilePic || 
               `https://ui-avatars.com/api/?name=${responseData.requester.name}&background=random`
           }]);
         } else if (acceptedUser) {

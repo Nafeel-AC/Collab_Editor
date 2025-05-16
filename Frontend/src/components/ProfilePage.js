@@ -385,16 +385,12 @@ const ProfilePage = () => {
         console.log('Is admin value:', response.data.isAdmin);
         console.log('Role value:', response.data.role);
         
-        // Ensure profile picture URL is properly formatted using getImageUrl helper
+        // Cloudinary URLs are already absolute, no need to process them
         let profilePicUrl = response.data.profilePic;
-        if (profilePicUrl) {
-          profilePicUrl = getImageUrl(profilePicUrl);
-          console.log('Processed profile image URL:', profilePicUrl);
-        }
+        console.log('Profile image URL:', profilePicUrl);
         
         const userData = {
-          ...response.data,
-          profilePic: profilePicUrl
+          ...response.data
         };
         
         setUser(userData);
@@ -1295,9 +1291,14 @@ const ProfilePage = () => {
                     <div className="w-24 h-24 mb-4 relative">
                       <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-md"></div>
                       <img 
-                        src={user.profilePic ? getImageUrl(user.profilePic) : `https://ui-avatars.com/api/?name=${user.userName}&background=random&size=200`} 
+                        src={user.profilePic || `https://ui-avatars.com/api/?name=${user.userName}&background=random&size=200`} 
                         alt={user.userName}
                         className="w-24 h-24 rounded-full object-cover border-2 border-[#2A2A3A] relative z-10"
+                        onError={(e) => {
+                          console.error("Error loading profile image:", e);
+                          e.target.onerror = null;
+                          e.target.src = `https://ui-avatars.com/api/?name=${user.userName || 'User'}&background=random&size=200`;
+                        }}
                       />
                     </div>
                     <h2 className="text-xl font-bold text-white">{user.userName}</h2>

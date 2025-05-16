@@ -1,24 +1,5 @@
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
-
-// Create upload directory if it doesn't exist
-const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Set up storage for uploaded files
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const fileExtension = path.extname(file.originalname);
-    cb(null, `profile-${req.userId}-${uniqueSuffix}${fileExtension}`);
-  }
-});
 
 // File filter to only accept image files
 const fileFilter = (req, file, cb) => {
@@ -29,9 +10,9 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-// Create the multer upload instance
+// Create the multer upload instance with memory storage for Cloudinary
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(), // Use memory storage instead of disk storage
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB max file size
   },
