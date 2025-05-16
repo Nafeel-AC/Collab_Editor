@@ -38,8 +38,10 @@ export default function LandingPage() {
           
           // Process profile picture URL
           let profileData = response.data;
-          if (profileData.profilePic && !profileData.profilePic.startsWith('http')) {
+          if (profileData.profilePic) {
+            // Use the getImageUrl helper function to properly format the URL
             profileData.profilePic = getImageUrl(profileData.profilePic);
+            console.log("Updated profile picture URL:", profileData.profilePic);
           }
           
           setUserProfile(profileData);

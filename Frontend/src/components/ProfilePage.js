@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Edit, Save, User, MapPin, GithubIcon, LinkedinIcon, TwitterIcon, Mail, Phone, Calendar, ArrowLeft, MailIcon, Code, Settings, Upload, Camera, MessageCircle, AlertCircle, Users, Trash2, Shield, Layers, Monitor, MoreHorizontal, Filter, Search, RefreshCw, UserX, X } from 'lucide-react';
-import { API_BASE_URL } from '../config/api.config.js';
+import { API_BASE_URL, getImageUrl } from '../config/api.config.js';
 
 // Add a style element to force dark theme globally
 const darkModeStyle = `
@@ -385,10 +385,11 @@ const ProfilePage = () => {
         console.log('Is admin value:', response.data.isAdmin);
         console.log('Role value:', response.data.role);
         
-        // Ensure profile picture URL is properly formatted
+        // Ensure profile picture URL is properly formatted using getImageUrl helper
         let profilePicUrl = response.data.profilePic;
-        if (profilePicUrl && !profilePicUrl.startsWith('http')) {
-          profilePicUrl = `${API_BASE_URL}${profilePicUrl}`;
+        if (profilePicUrl) {
+          profilePicUrl = getImageUrl(profilePicUrl);
+          console.log('Processed profile image URL:', profilePicUrl);
         }
         
         const userData = {
@@ -822,7 +823,7 @@ const ProfilePage = () => {
                               <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/5 blur-sm"></div>
                               {user.profilePic ? (
                                 <img 
-                                  src={user.profilePic.startsWith('http') ? user.profilePic : `${API_BASE_URL}${user.profilePic}`} 
+                                  src={getImageUrl(user.profilePic)} 
                                   alt={user.userName} 
                                   className="h-8 w-8 rounded-full object-cover relative z-10"
                                 />
@@ -1294,7 +1295,7 @@ const ProfilePage = () => {
                     <div className="w-24 h-24 mb-4 relative">
                       <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-md"></div>
                       <img 
-                        src={user.profilePic || `https://ui-avatars.com/api/?name=${user.userName}&background=random&size=200`} 
+                        src={user.profilePic ? getImageUrl(user.profilePic) : `https://ui-avatars.com/api/?name=${user.userName}&background=random&size=200`} 
                         alt={user.userName}
                         className="w-24 h-24 rounded-full object-cover border-2 border-[#2A2A3A] relative z-10"
                       />
