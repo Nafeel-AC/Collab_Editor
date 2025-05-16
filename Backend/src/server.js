@@ -27,6 +27,7 @@ const io = new Server(server, {
             "http://127.0.0.1:3000", 
             "http://localhost:5173",
             "https://codesync-lake.vercel.app",
+            "https://collabeditior-production-51a9.up.railway.app",
             process.env.FRONTEND_URL || "https://collab-editor-frontend.vercel.app" // Add your Vercel frontend URL here
         ],
         methods: ["GET", "POST"],

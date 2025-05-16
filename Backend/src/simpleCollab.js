@@ -19,7 +19,12 @@ export const initSimpleCollabSocket = (server, existingIo = null) => {
   // Use existing io instance if provided, otherwise create a new one
   const io = existingIo || new Server(server, {
     cors: {
-      origin: "*", // Allow all origins (for development)
+      origin: [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5173',
+        'https://codesync-lake.vercel.app'
+      ], // Specific origins instead of wildcard
       methods: ["GET", "POST"],
       credentials: true
     },
