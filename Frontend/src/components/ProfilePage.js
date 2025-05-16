@@ -634,18 +634,14 @@ const ProfilePage = () => {
       
       console.log('Profile update response:', response.data);
       
-      // Ensure profile picture URL is properly formatted
-      let profilePicUrl = response.data.user.profilePic;
+      // Backend returns the updated user directly, not nested in a user object
+      let profilePicUrl = response.data.profilePic;
       if (profilePicUrl && !profilePicUrl.startsWith('http')) {
         profilePicUrl = `${API_BASE_URL}${profilePicUrl}`;
       }
       
-      const userData = {
-        ...response.data,
-        profilePic: profilePicUrl
-      };
-      
-      setUser(userData);
+      // Update the user state with the response data
+      setUser(response.data);
       setEditMode(false);
       setSelectedFile(null);
       setPreviewUrl('');
