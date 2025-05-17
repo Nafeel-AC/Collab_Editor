@@ -32,10 +32,10 @@ const WelcomePage = () => {
       <div className="fixed inset-0 w-screen h-screen z-0">
         <StarsBackground 
           className="absolute inset-0 w-full h-full" 
-          starDensity={0.0012}
+          starDensity={0.0018}
           twinkleProbability={1}
-          minTwinkleSpeed={0.2}
-          maxTwinkleSpeed={0.6}
+          minTwinkleSpeed={0.3}
+          maxTwinkleSpeed={0.8}
         />
         <ShootingStars 
           minSpeed={15}

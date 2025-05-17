@@ -23,8 +23,8 @@ export const StarsBackground = ({
       return {
         x: Math.random() * width,
         y: Math.random() * height,
-        radius: Math.random() * 0.05 + 0.5,
-        opacity: Math.random() * 0.5 + 0.5,
+        radius: Math.random() * 0.1 + 0.8,
+        opacity: Math.random() * 0.2 + 0.8,
         twinkleSpeed: shouldTwinkle
           ? minTwinkleSpeed +
             Math.random() * (maxTwinkleSpeed - minTwinkleSpeed)
@@ -93,8 +93,8 @@ export const StarsBackground = ({
 
         if (star.twinkleSpeed !== null) {
           star.opacity =
-            0.5 +
-            Math.abs(Math.sin((Date.now() * 0.001) / star.twinkleSpeed) * 0.5);
+            0.8 +
+            Math.abs(Math.sin((Date.now() * 0.001) / star.twinkleSpeed) * 0.2);
         }
       });
 

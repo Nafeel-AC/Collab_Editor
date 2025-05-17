@@ -64,9 +64,9 @@ const ProtectedRoute = ({ children }) => {
 const AuthRedirect = ({ children }) => {
   const token = localStorage.getItem('token');
   
-  // If user is logged in, redirect to the dashboard 
+  // If user is logged in, redirect to the landing page instead of dashboard 
   if (token) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/home" replace />;
   }
   
   return children;
@@ -168,7 +168,7 @@ function App() {
         {/* Catch all route - redirect to welcome or dashboard based on auth status */}
         <Route path="*" element={
           localStorage.getItem('token') 
-            ? <Navigate to="/dashboard" replace /> 
+            ? <Navigate to="/home" replace /> 
             : <Navigate to="/welcome" replace />
         } />
       </Routes>

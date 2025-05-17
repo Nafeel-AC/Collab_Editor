@@ -14,12 +14,12 @@ const LoginPage = () => {
   const [glowIntensity, setGlowIntensity] = useState(0.3);
   const navigate = useNavigate();
 
-  // Check if already logged in - if so, go to dashboard
+  // Check if already logged in - if so, go to landing page
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      console.log("User already logged in, redirecting to dashboard");
-      navigate("/dashboard", { replace: true });
+      console.log("User already logged in, redirecting to landing page");
+      navigate("/home", { replace: true });
     }
   }, [navigate]);
 
@@ -52,8 +52,8 @@ const LoginPage = () => {
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("userName", response.data.userName);
         
-        // Redirect to Dashboard
-        navigate("/dashboard", { replace: true });
+        // Redirect to Landing Page instead of Dashboard
+        navigate("/home", { replace: true });
       } else {
         setError("Invalid login response");
       }
