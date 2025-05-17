@@ -110,8 +110,8 @@ const SignupPage = () => {
         localStorage.setItem("userName", response.data.userName);
         localStorage.setItem("userId", response.data.userId);
         
-        // Redirect to dashboard after successful registration
-        navigate("/dashboard", { replace: true });
+        // Redirect to landing page after successful registration
+        navigate("/home", { replace: true });
       } else {
         setError("Invalid registration response");
       }
