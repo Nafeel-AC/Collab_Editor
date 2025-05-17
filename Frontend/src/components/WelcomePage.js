@@ -88,7 +88,7 @@ const WelcomePage = () => {
             <Button
               as={Link}
               to="/LoginPage"
-              containerClassName="w-40 h-12"
+              containerClassName="w-40 h-12 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-cyan-500/40"
               borderClassName="bg-[radial-gradient(#06b6d4_40%,transparent_60%)] opacity-90"
               className="bg-black/30 border-cyan-500/30 text-white font-semibold"
               duration={2000}
@@ -99,7 +99,7 @@ const WelcomePage = () => {
             <Button
               as={Link}
               to="/SignupPage"
-              containerClassName="w-40 h-12"
+              containerClassName="w-40 h-12 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/40"
               borderClassName="bg-[radial-gradient(#a855f7_40%,transparent_60%)] opacity-90"
               className="bg-black/30 border-purple-500/30 text-white font-semibold"
               duration={3000}
