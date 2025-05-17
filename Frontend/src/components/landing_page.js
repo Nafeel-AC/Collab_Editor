@@ -1,11 +1,11 @@
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Link, useNavigate } from "react-router-dom";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import GradientText from "./gradient_text";
 import { CarouselDemo } from "./CarouselDemo";
 import { MacbookDemo } from "./MacbookDemo";
 import Footer from "./Footer";
-import { LogOut, User, ChevronDown, Menu, X } from "lucide-react";
+import { LogOut, User, ChevronDown } from "lucide-react";
 import { TypewriterEffectSmooth } from "./TypewriterEffect";
 import axios from "axios";
 import { API_BASE_URL, getImageUrl } from '../config/api.config';
@@ -16,9 +16,6 @@ export default function LandingPage() {
   const [userName, setUserName] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  const mobileMenuRef = useRef(null);
 
   // Check if user is logged in
   useEffect(() => {
@@ -60,30 +57,12 @@ export default function LandingPage() {
     }
   }, []);
 
-  // Handle click outside dropdown
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-        setMobileMenuOpen(false);
-      }
-    }
-    
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("userName");
     localStorage.removeItem("userId");
     setIsAuthenticated(false);
     setShowDropdown(false);
-    setMobileMenuOpen(false);
     
     // Force reload to ensure all components update
     window.location.reload();
@@ -107,22 +86,27 @@ export default function LandingPage() {
               </a>
             </div>
 
-            {/* Mobile menu button */}
             <div className="flex md:hidden">
-              <button 
-                type="button" 
-                className="text-white p-2 rounded-md"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              >
-                {mobileMenuOpen ? (
-                  <X className="w-6 h-6" />
-                ) : (
-                  <Menu className="w-6 h-6" />
-                )}
+              <button type="button" className="text-white">
+                <span aria-hidden="true">
+                  <svg
+                    className="w-7 h-7"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.5"
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
+                  </svg>
+                </span>
               </button>
             </div>
 
-            {/* Desktop Navigation */}
             <nav className="hidden ml-10 mr-auto space-x-10 lg:ml-20 lg:space-x-12 md:flex md:items-center md:justify-start">
               <Link
                 to="/robot-animation"
@@ -157,7 +141,6 @@ export default function LandingPage() {
               </Link>
             </nav>
 
-            {/* Desktop authentication buttons */}
             {!isAuthenticated ? (
               <div className="relative hidden md:items-center md:justify-center md:inline-flex group">
                 <div className="absolute transition-all duration-200 rounded-full -inset-px bg-gradient-to-r from-cyan-500 to-purple-500 group-hover:shadow-lg group-hover:shadow-cyan-500/50"></div>
@@ -169,7 +152,7 @@ export default function LandingPage() {
                 </Link>
               </div>
             ) : (
-              <div className="relative hidden md:flex items-center" ref={dropdownRef}>
+              <div className="relative hidden md:flex items-center">
                 <button 
                   onClick={() => setShowDropdown(!showDropdown)}
                   className="flex items-center space-x-2 text-gray-400 hover:text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-all duration-200"
@@ -215,126 +198,19 @@ export default function LandingPage() {
                       to="/tasks"
                       className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
                     >
-                      Tasks
+                      My Tasks
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="w-full text-left flex items-center px-4 py-2 text-sm text-red-400 hover:bg-gray-800 hover:text-red-300"
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white flex items-center"
                     >
-                      <LogOut size={14} className="mr-2" />
-                      Sign out
+                      <LogOut size={14} className="mr-2" /> Sign Out
                     </button>
                   </div>
                 )}
               </div>
             )}
           </div>
-        </div>
-
-        {/* Mobile menu, show/hide based on menu state */}
-        <div
-          ref={mobileMenuRef}
-          className={`md:hidden fixed inset-0 z-50 bg-gray-900/95 backdrop-blur-sm transition-all duration-300 ${
-            mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-          }`}
-        >
-          <div className="flex items-center justify-between p-4 border-b border-gray-700">
-            <a href="#" className="text-2xl font-bold text-white">CodeSync</a>
-            <button 
-              onClick={() => setMobileMenuOpen(false)}
-              className="p-2 text-white rounded-md"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-          
-          <nav className="flex flex-col p-4 space-y-4">
-            <Link
-              to="/robot-animation"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-lg font-bold text-gray-300 border-b border-gray-700"
-            >
-              ChatBot
-            </Link>
-
-            {isAuthenticated && (
-              <Link
-                to="/tasks"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-2 text-lg font-bold text-gray-300 border-b border-gray-700"
-              >
-                Tasks
-              </Link>
-            )}
-
-            {isAuthenticated && (
-              <Link
-                to="/Dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-2 text-lg font-bold text-gray-300 border-b border-gray-700"
-              >
-                Dashboard
-              </Link>
-            )}
-
-            <Link
-              to="/Support"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block py-2 text-lg font-bold text-gray-300 border-b border-gray-700"
-            >
-              Support
-            </Link>
-
-            {isAuthenticated ? (
-              <>
-                <div className="flex items-center py-2 space-x-2 border-b border-gray-700">
-                  {userProfile?.profilePic ? (
-                    <img 
-                      src={userProfile.profilePic} 
-                      alt={userName}
-                      className="h-10 w-10 rounded-full object-cover border-2 border-cyan-500"
-                    />
-                  ) : (
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center">
-                      <User size={20} className="text-white" />
-                    </div>
-                  )}
-                  <span className="font-medium text-white">{userName}</span>
-                </div>
-                <Link
-                  to="/ProfilePage"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block py-2 text-base text-gray-300"
-                >
-                  My Profile
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center py-2 text-base text-red-400"
-                >
-                  <LogOut size={16} className="mr-2" />
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <div className="pt-4">
-                <Link
-                  to="/LoginPage"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block w-full py-3 text-center text-white bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg font-bold"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/SignupPage"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block w-full py-3 mt-3 text-center text-white bg-gray-800 rounded-lg font-bold"
-                >
-                  Sign Up
-                </Link>
-              </div>
-            )}
-          </nav>
         </div>
       </header>
 
