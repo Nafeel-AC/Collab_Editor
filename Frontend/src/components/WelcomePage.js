@@ -1,30 +1,69 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShootingStars } from './ui/shooting-stars';
 import { StarsBackground } from './ui/stars-background';
 import { Button } from './ui/moving-border';
 import { TypewriterEffectSmooth } from './TypewriterEffect';
+import { motion } from 'framer-motion';
 
 const WelcomePage = () => {
+  const [hoverLogin, setHoverLogin] = useState(false);
+  const [hoverSignUp, setHoverSignUp] = useState(false);
+
   // Words for typewriter effect
   const words = [
     {
       text: "Collaborative",
-      className: "text-cyan-500"
+      className: "text-cyan-500 font-bold"
     },
     {
       text: "Coding",
-      className: "text-white"
+      className: "text-white font-bold"
     },
     {
       text: "Made",
-      className: "text-white"
+      className: "text-white font-bold"
     },
     {
       text: "Simple",
-      className: "text-purple-500"
+      className: "text-purple-500 font-bold"
     },
   ];
+
+  // Custom button wrappers with hover effects
+  const LoginButton = ({ children, ...props }) => (
+    <motion.div
+      onHoverStart={() => setHoverLogin(true)}
+      onHoverEnd={() => setHoverLogin(false)}
+      whileHover={{ 
+        scale: 1.05,
+        rotate: hoverLogin ? [0, -1, 1, -1, 0] : 0,
+      }}
+      transition={{ 
+        scale: { duration: 0.2 },
+        rotate: { duration: 0.3, repeat: 2, repeatType: "mirror" }
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+
+  const SignUpButton = ({ children, ...props }) => (
+    <motion.div
+      onHoverStart={() => setHoverSignUp(true)}
+      onHoverEnd={() => setHoverSignUp(false)}
+      whileHover={{ 
+        scale: 1.05,
+        y: [0, -5, 0],
+      }}
+      transition={{ 
+        scale: { duration: 0.2 },
+        y: { duration: 0.5, repeat: Infinity, repeatType: "reverse" }
+      }}
+    >
+      {children}
+    </motion.div>
+  );
 
   return (
     <div className="relative min-h-screen w-full bg-black overflow-hidden">
@@ -85,27 +124,31 @@ const WelcomePage = () => {
           
           {/* Call to action buttons with moving borders */}
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6">
-            <Button
-              as={Link}
-              to="/LoginPage"
-              containerClassName="w-40 h-12"
-              borderClassName="bg-[radial-gradient(#06b6d4_40%,transparent_60%)] opacity-90"
-              className="bg-black/30 border-cyan-500/30 text-white font-semibold"
-              duration={2000}
-            >
-              Login
-            </Button>
+            <LoginButton>
+              <Button
+                as={Link}
+                to="/LoginPage"
+                containerClassName="w-40 h-12"
+                borderClassName="bg-[radial-gradient(#06b6d4_40%,transparent_60%)] opacity-90"
+                className="bg-black/30 border-cyan-500/30 text-white font-semibold hover:bg-cyan-950/30 transition-colors duration-300"
+                duration={2000}
+              >
+                {hoverLogin ? "Let's Go!" : "Login"}
+              </Button>
+            </LoginButton>
             
-            <Button
-              as={Link}
-              to="/SignupPage"
-              containerClassName="w-40 h-12"
-              borderClassName="bg-[radial-gradient(#a855f7_40%,transparent_60%)] opacity-90"
-              className="bg-black/30 border-purple-500/30 text-white font-semibold"
-              duration={3000}
-            >
-              Sign Up
-            </Button>
+            <SignUpButton>
+              <Button
+                as={Link}
+                to="/SignupPage"
+                containerClassName="w-40 h-12"
+                borderClassName="bg-[radial-gradient(#a855f7_40%,transparent_60%)] opacity-90"
+                className="bg-black/30 border-purple-500/30 text-white font-semibold hover:bg-purple-950/30 transition-colors duration-300"
+                duration={3000}
+              >
+                {hoverSignUp ? "Join Now!" : "Sign Up"}
+              </Button>
+            </SignUpButton>
           </div>
         </div>
       </div>
