@@ -34,8 +34,8 @@ const WelcomePage = () => {
           className="absolute inset-0 w-full h-full" 
           starDensity={0.0018}
           twinkleProbability={1}
-          minTwinkleSpeed={0.3}
-          maxTwinkleSpeed={0.8}
+          minTwinkleSpeed={0.15}
+          maxTwinkleSpeed={0.4}
         />
         <ShootingStars 
           minSpeed={15}
