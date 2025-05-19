@@ -27,8 +27,8 @@ const EditorPage = () => {
   const navigate = useNavigate();
   
   // Extract project info from location state
-  const projectId = location.state?.projectId;
-  const isExistingProject = location.state?.isExistingProject;
+  const projectId = location.state?.projectId || location.state?.originalProjectId;
+  const isExistingProject = !!projectId || location.state?.isExistingProject;
   
   const [code, setCode] = useState('// Start coding here');
   const [language, setLanguage] = useState('javascript');
@@ -706,18 +706,37 @@ const EditorPage = () => {
   // Function to update a file's content in the backend
   const updateFileContent = async (fileId, content) => {
     try {
-      await axios.put(`${API_BASE_URL}/api/files/${fileId}`, {
+      console.log(`Updating file content for file ID: ${fileId}, content length: ${content.length}`);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return false;
+      }
+      
+      // Make sure we have all required parameters
+      if (!fileId || !roomId) {
+        console.error('Missing required parameters for file update', { fileId, roomId });
+        return false;
+      }
+      
+      const response = await axios.put(`${API_BASE_URL}/api/files/${fileId}`, {
         content,
-        roomId
+        roomId,
+        updatedBy: username
       }, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
-      console.log('File content updated in backend');
+      console.log('File content updated in backend', response.data);
+      return true;
     } catch (error) {
-      console.error('Error updating  content:', error);
+      console.error('Error updating file content:', error.response?.data || error.message || error);
+      // Don't throw the error, just return false to indicate failure
+      return false;
     }
   };
   
@@ -835,19 +854,47 @@ const EditorPage = () => {
     
     try {
       // Save the current code to the selected file if any
+      let fileUpdateSuccess = true;
       if (selectedFile) {
-        await updateFileContent(selectedFile._id, code);
+        fileUpdateSuccess = await updateFileContent(selectedFile._id, code);
       }
       
+      if (!fileUpdateSuccess) {
+        console.warn('File content update failed, but continuing with project save');
+      }
+      
+      console.log('Saving project with the following data:', {
+        roomId,
+        projectName: projectName || (isExistingProject ? 'Untitled Project' : ''),
+        username,
+        isExistingProject,
+        projectId
+      });
+      
       // Create or update project in backend
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Check if we have an original project ID in the room state
       const response = await axios.post(`${API_BASE_URL}/api/projects/save/${roomId}`, {
         name: projectName || (isExistingProject ? 'Untitled Project' : ''),
         description: projectDescription,
         // Pass projectId for existing projects
-        projectId: isExistingProject ? projectId : undefined
+        projectId: projectId,
+        // Include the username as creator
+        createdBy: username,
+        // Add room information to help debug permission issues
+        roomData: {
+          fromOriginalProject: isExistingProject,
+          originalProjectId: location.state?.originalProjectId,
+          projectId: location.state?.projectId
+        }
       }, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
@@ -871,178 +918,21 @@ const EditorPage = () => {
       // Continue with room closure if applicable
       await finishRoomClose();
     } catch (error) {
-      console.error('Error saving project:', error);
+      console.error('Error saving project:', error.response?.data || error.message || error);
       setIsSaving(false);
-      alert(`Error saving project: ${error.response?.data?.message || error.message}`);
-    }
-  };
-  
-  // Function to cancel project save (just close the modal)
-  const cancelSaveProject = () => {
-    setShowSaveModal(false);
-  };
-  
-  // Function to finish room closure process
-  const finishRoomClose = async () => {
-    try {
-      // Only attempt to delete the room if it's a newly created room
-      // If it's an existing project opened from the dashboard, just navigate away
-      if (!location.state?.isExistingProject) {
-        // Clean up on server
-        await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        
-        console.log('Room closed successfully');
+      
+      // Provide more specific error messages based on status codes
+      if (error.response) {
+        if (error.response.status === 403) {
+          alert(`Permission denied: You don't have permission to save this project. Only the room creator can save it.`);
+        } else if (error.response.status === 400) {
+          alert(`Error saving project: ${error.response.data?.message || 'Invalid request data'}`);
+        } else {
+          alert(`Error saving project: ${error.response.data?.message || error.message || 'Unknown error'}`);
+        }
       } else {
-        console.log('Navigating away from existing project without deleting room');
+        alert(`Error saving project: ${error.message || 'Connection error'}`);
       }
-      
-      // Clean up socket
-      if (socketRef.current) {
-        if (socketRef.current.connected) {
-      socketRef.current.emit('leave-room', { roomId });
-        }
-        socketRef.current.disconnect();
-      }
-      
-      // Navigate to dashboard
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error closing room:', error);
-      
-      // Even if there's an error, still navigate away
-      navigate('/dashboard');
-    }
-  };
-  
-  // Function to handle beforeunload event
-    const handleBeforeUnload = async (e) => {
-    // Show a confirmation dialog to the user
-    const message = 'Are you sure you want to leave? Any unsaved changes will be lost.';
-    e.returnValue = message;
-    
-    return message;
-  };
-  
-  // Function to check if we're on mobile
-  const isMobile = () => window.innerWidth < 768;
-
-  // Add resize listener to update view on window resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (!isMobile()) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    handleResize(); // Initial check
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-  
-  // Load project data if this is an existing project
-  useEffect(() => {
-    // If this is an existing project, fetch the project data
-    if (isExistingProject && projectId) {
-      console.log(`Loading existing project (ID: ${projectId}) into room: ${roomId}`);
-      fetchProjectData(projectId);
-      
-      // Update document title to show it's an existing project
-      document.title = `Loading project... - ${roomId}`;
-    } else {
-      document.title = `Collaborative Editor - ${roomId}`;
-    }
-  }, [projectId, isExistingProject, roomId]);
-  
-  // Function to fetch project data
-  const fetchProjectData = async (projectId) => {
-    try {
-      setIsLoadingProject(true);
-      
-      // Get authentication token
-          const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('No authentication token found');
-        return;
-      }
-      
-      console.log(`Fetching project data for project ID: ${projectId}`);
-      
-      // Fetch project details
-      const response = await axios.get(`${API_BASE_URL}/api/projects/${projectId}`, {
-              headers: {
-                Authorization: `Bearer ${token}`
-        }
-      });
-      
-      if (response.data) {
-        console.log('Project data loaded:', response.data);
-        
-        // Store project info
-        setProjectName(response.data.name || '');
-        setProjectDescription(response.data.description || '');
-        document.title = `${response.data.name || 'Project'} - ${roomId}`;
-        
-        // Load files from project
-        if (response.data.files && Array.isArray(response.data.files)) {
-          console.log('Project files found:', response.data.files.length);
-          setProjectFiles(response.data.files);
-          
-          // If there are files, select the first one to display in the editor
-          if (response.data.files.length > 0) {
-            const mainFile = response.data.files[0];
-            console.log('Setting main file:', mainFile);
-            setSelectedFile(mainFile);
-            setCode(mainFile.content || '// Start coding here');
-            
-            // If we have a language extension, set the editor language
-            if (mainFile.name) {
-              const extension = mainFile.name.split('.').pop().toLowerCase();
-              switch (extension) {
-                case 'js':
-                  setLanguage('javascript');
-                  break;
-                case 'py':
-                  setLanguage('python');
-                  break;
-                case 'java':
-                  setLanguage('java');
-                  break;
-                case 'cpp':
-                case 'c':
-                  setLanguage('cpp');
-                  break;
-                case 'html':
-                  setLanguage('html');
-                  break;
-                case 'css':
-                  setLanguage('css');
-                  break;
-                case 'json':
-                  setLanguage('json');
-                  break;
-                case 'md':
-                  setLanguage('markdown');
-                  break;
-                default:
-                  // Keep default language
-                  break;
-              }
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching project data:', error);
-      alert(`Error loading project: ${error.response?.data?.message || error.message}`);
-    } finally {
-      setIsLoadingProject(false);
     }
   };
   
@@ -1654,6 +1544,180 @@ const EditorPage = () => {
       }
     };
   }, [socketRef.current]);
+  
+  // Function to cancel project save (just close the modal)
+  const cancelSaveProject = () => {
+    setShowSaveModal(false);
+  };
+  
+  // Function to finish room closure process
+  const finishRoomClose = async () => {
+    try {
+      // Only attempt to delete the room if it's a newly created room
+      // If it's an existing project opened from the dashboard, just navigate away
+      if (!isExistingProject && !projectId) {
+        console.log('Cleaning up room as this is not an existing project');
+        // Clean up on server
+        await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        console.log('Room closed successfully');
+      } else {
+        console.log('Navigating away from existing project without deleting room');
+      }
+      
+      // Clean up socket
+      if (socketRef.current) {
+        if (socketRef.current.connected) {
+          console.log(`Leaving room: ${roomId}`);
+          socketRef.current.emit('leave-room', { 
+            roomId,
+            username 
+          });
+        }
+        socketRef.current.disconnect();
+      }
+      
+      // Navigate to dashboard
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error closing room:', error);
+      
+      // Even if there's an error, still navigate away
+      navigate('/dashboard');
+    }
+  };
+  
+  // Function to handle beforeunload event
+  const handleBeforeUnload = async (e) => {
+    // Show a confirmation dialog to the user
+    const message = 'Are you sure you want to leave? Any unsaved changes will be lost.';
+    e.returnValue = message;
+    
+    return message;
+  };
+  
+  // Function to check if we're on mobile
+  const isMobile = () => window.innerWidth < 768;
+
+  // Add resize listener to update view on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (!isMobile()) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial check
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
+  // Load project data if this is an existing project
+  useEffect(() => {
+    // If this is an existing project, fetch the project data
+    if (isExistingProject && projectId) {
+      console.log(`Loading existing project (ID: ${projectId}) into room: ${roomId}`);
+      fetchProjectData(projectId);
+      
+      // Update document title to show it's an existing project
+      document.title = `Loading project... - ${roomId}`;
+    } else {
+      document.title = `Collaborative Editor - ${roomId}`;
+    }
+  }, [projectId, isExistingProject, roomId]);
+  
+  // Function to fetch project data
+  const fetchProjectData = async (projectId) => {
+    try {
+      setIsLoadingProject(true);
+      
+      // Get authentication token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+      
+      console.log(`Fetching project data for project ID: ${projectId}`);
+      
+      // Fetch project details
+      const response = await axios.get(`${API_BASE_URL}/api/projects/${projectId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (response.data) {
+        console.log('Project data loaded:', response.data);
+        
+        // Store project info
+        setProjectName(response.data.project.name || '');
+        setProjectDescription(response.data.project.description || '');
+        document.title = `${response.data.project.name || 'Project'} - ${roomId}`;
+        
+        // Load files from project
+        if (response.data.files && Array.isArray(response.data.files)) {
+          console.log('Project files found:', response.data.files.length);
+          setProjectFiles(response.data.files);
+          
+          // If there are files, select the first one to display in the editor
+          if (response.data.files.length > 0) {
+            const mainFile = response.data.files[0];
+            console.log('Setting main file:', mainFile);
+            setSelectedFile(mainFile);
+            setCode(mainFile.content || '// Start coding here');
+            
+            // If we have a language extension, set the editor language
+            if (mainFile.name) {
+              const extension = mainFile.name.split('.').pop().toLowerCase();
+              switch (extension) {
+                case 'js':
+                  setLanguage('javascript');
+                  break;
+                case 'py':
+                  setLanguage('python');
+                  break;
+                case 'java':
+                  setLanguage('java');
+                  break;
+                case 'cpp':
+                case 'c':
+                  setLanguage('cpp');
+                  break;
+                case 'html':
+                  setLanguage('html');
+                  break;
+                case 'css':
+                  setLanguage('css');
+                  break;
+                case 'json':
+                  setLanguage('json');
+                  break;
+                case 'md':
+                  setLanguage('markdown');
+                  break;
+                default:
+                  // Keep default language
+                  break;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching project data:', error);
+      alert(`Error loading project: ${error.response?.data?.message || error.message}`);
+    } finally {
+      setIsLoadingProject(false);
+    }
+  };
   
   return (
     <div className="flex flex-col h-screen bg-[#14141B] text-white">
