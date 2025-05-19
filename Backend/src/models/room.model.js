@@ -75,6 +75,37 @@ const clearProblemIndex = async () => {
 // Ensure roomId is used as the only unique identifier
 roomSchema.index({ roomId: 1 }, { unique: true });
 
+// Add statics method to safely find or create room
+roomSchema.statics.findOrCreateRoom = async function(roomId) {
+  try {
+    if (!roomId || typeof roomId !== 'string' || roomId.trim() === '') {
+      throw new Error('Invalid room ID');
+    }
+    
+    let room = await this.findOne({ roomId });
+    
+    if (!room) {
+      console.log(`Creating new room ${roomId} via findOrCreateRoom`);
+      room = new this({
+        roomId,
+        createdBy: 'system', // Default creator for system-created rooms
+        createdAt: new Date(),
+        lastActive: new Date()
+      });
+      
+      await room.save();
+      console.log(`Room ${roomId} created successfully`);
+    } else {
+      console.log(`Found existing room: ${roomId}`);
+    }
+    
+    return room;
+  } catch (error) {
+    console.error(`Error in findOrCreateRoom:`, error);
+    throw error;
+  }
+};
+
 export const Room = mongoose.model("Room", roomSchema);
 
 // Execute the function to fix the index issue

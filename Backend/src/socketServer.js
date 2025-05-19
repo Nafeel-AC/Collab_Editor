@@ -104,7 +104,25 @@ export const initSocketServer = (io) => {
           try {
             console.log(`Using findOrCreateRoom for ${roomId} (project: ${projectId || 'unknown'})`);
             // Use the reliable method to find or create the room
-            room = await Room.findOrCreateRoom(roomId);
+            // Check if Room.findOrCreateRoom method exists
+            if (typeof Room.findOrCreateRoom !== 'function') {
+              console.error('Room.findOrCreateRoom is not available - attempting fallback');
+              // Fallback implementation
+              room = await Room.findOne({ roomId });
+              if (!room) {
+                console.log(`Room ${roomId} not found, creating it...`);
+                room = new Room({
+                  roomId,
+                  createdBy: 'system',
+                  createdAt: new Date(),
+                  lastActive: new Date()
+                });
+                await room.save();
+              }
+            } else {
+              // Use the proper method
+              room = await Room.findOrCreateRoom(roomId);
+            }
           } catch (roomError) {
             console.error(`Error finding/creating room:`, roomError);
             socket.emit("join-room-error", { 
