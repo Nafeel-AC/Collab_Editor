@@ -824,6 +824,37 @@ const toggleAdminStatus = async (req, res) => {
     }
 };
 
+// Get user profiles by username list
+const getProfilesByUsername = async (req, res) => {
+    try {
+        const { usernames } = req.body;
+        
+        if (!usernames || !Array.isArray(usernames) || usernames.length === 0) {
+            return res.status(400).json({ error: "Invalid usernames list" });
+        }
+        
+        console.log(`Fetching profiles for ${usernames.length} usernames:`, usernames);
+        
+        // Find all users matching the provided usernames
+        const users = await User.find({ userName: { $in: usernames } })
+            .select('_id userName profilePic');
+        
+        console.log(`Found ${users.length} matching profiles`);
+        
+        // Return the profiles with properly formatted profile pic URLs
+        return res.status(200).json({ 
+            profiles: users.map(user => ({
+                _id: user._id,
+                userName: user.userName,
+                profilePic: user.profilePic
+            }))
+        });
+    } catch (error) {
+        console.error("Error fetching profiles by username:", error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 export {
     loginConfirmation, 
     registerUser, 
@@ -843,5 +874,6 @@ export {
     getAllRegisteredUsers,
     deleteUser,
     toggleAdminStatus,
-    checkProfilePicMigration
+    checkProfilePicMigration,
+    getProfilesByUsername
 };

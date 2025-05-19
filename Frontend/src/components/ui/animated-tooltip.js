@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   motion,
   useTransform,
@@ -8,6 +8,31 @@ import {
   useMotionValue,
   useSpring,
 } from "motion/react";
+
+// Image component with fallback
+const ImageWithFallback = ({ src, alt, ...props }) => {
+  const [error, setError] = useState(false);
+  
+  // Use fallback avatar if image fails to load
+  const handleError = () => {
+    console.error("Error loading image:", src);
+    setError(true);
+  };
+  
+  // If error, use fallback avatar
+  const imageSrc = error 
+    ? `https://ui-avatars.com/api/?name=${encodeURIComponent(alt || 'User')}&background=random&size=100` 
+    : src;
+  
+  return (
+    <img 
+      src={imageSrc} 
+      alt={alt || "User"}
+      onError={handleError}
+      {...props}
+    />
+  );
+};
 
 export const AnimatedTooltip = ({
   items,
@@ -30,7 +55,7 @@ export const AnimatedTooltip = ({
       {items.map((item, idx) => (
         <div
           className="group relative -mr-2"
-          key={item.name}
+          key={item.id || item.name || idx}
           onMouseEnter={() => setHoveredIndex(item.id)}
           onMouseLeave={() => setHoveredIndex(null)}>
           <AnimatePresence mode="popLayout">
@@ -65,10 +90,8 @@ export const AnimatedTooltip = ({
               </motion.div>
             )}
           </AnimatePresence>
-          <img
+          <ImageWithFallback
             onMouseMove={handleMouseMove}
-            height={size}
-            width={size}
             src={item.image}
             alt={item.name}
             className={`relative !m-0 rounded-full border-2 border-white object-cover object-top !p-0 transition duration-500 group-hover:z-30 group-hover:scale-105`} 

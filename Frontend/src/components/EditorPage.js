@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
-import { API_BASE_URL } from '../config/api.config';
+import { API_BASE_URL, getImageUrl } from '../config/api.config';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -98,7 +98,8 @@ const EditorPage = () => {
       reconnectionDelay: 1000,
       auth: {
         token: token
-      }
+      },
+      timeout: 10000 // Add a longer timeout
     });
     
     // Handle connection events
@@ -114,12 +115,23 @@ const EditorPage = () => {
       });
       
       console.log('Joined room:', roomId, 'as', username);
+      
+      // Request users immediately after joining
+      setTimeout(() => {
+        requestRoomUsers();
+      }, 1000);
     });
     
     // Handle connection error
     socketRef.current.on('connect_error', (error) => {
       console.error('Connection error:', error);
       setIsConnected(false);
+      
+      // Try to connect again after a delay
+      setTimeout(() => {
+        console.log('Attempting to reconnect...');
+        socketRef.current.connect();
+      }, 3000);
     });
     
     // Handle disconnection
@@ -132,6 +144,10 @@ const EditorPage = () => {
     socketRef.current.on('room-users', (users) => {
       console.log('Room users updated:', users);
       if (Array.isArray(users)) {
+        // Debug what profile data we're getting
+        users.forEach(user => {
+          console.log(`User ${user.username} profile data:`, user);
+        });
         setCurrentUsers(users);
       } else {
         console.error('Received non-array users data:', users);
@@ -232,359 +248,92 @@ const EditorPage = () => {
     
     // Set up an interval to refresh the users list every 30 seconds
     const intervalId = setInterval(() => {
-      if (socketRef.current && socketRef.current.connected) {
+      if (isConnected) {
         requestRoomUsers();
       }
     }, 30000);
     
+    // Clean up interval on unmount
     return () => clearInterval(intervalId);
-  }, [roomId]);
+  }, [isConnected, roomId]);
   
-  // Handle file selection
+  // Add a useEffect to fetch user profiles when users change
   useEffect(() => {
-    if (selectedFile && selectedFile.type === 'file') {
-      console.log('Selected file:', selectedFile.name);
-      setCode(selectedFile.content || '// Empty file');
-      
-      // Determine language based on file extension
-      const extension = selectedFile.name.split('.').pop().toLowerCase();
-      const langMap = {
-        'js': 'javascript',
-        'jsx': 'javascript',
-        'ts': 'javascript',
-        'tsx': 'javascript',
-        'py': 'python',
-        'java': 'java',
-        'cpp': 'cpp',
-        'c': 'cpp',
-        'h': 'cpp',
-        'html': 'html',
-        'css': 'css',
-        'json': 'json',
-        'md': 'markdown',
-      };
-      
-      const newLanguage = langMap[extension] || 'javascript';
-      setLanguage(newLanguage);
-      
-      // Notify others of language change if connected
-      if (socketRef.current && socketRef.current.connected) {
-        socketRef.current.emit('language-change', {
-          roomId,
-          language: newLanguage,
-          fileId: selectedFile._id,
-          sender: socketRef.current.id
-        });
-      }
-      
-      // Switch to editor tab on mobile after selecting a file
-      if (isMobile()) {
-        setActiveTab('editor');
-      }
+    if (currentUsers && currentUsers.length > 0) {
+      fetchUserProfiles(currentUsers);
     }
-  }, [selectedFile, roomId]);
+  }, [currentUsers]);
   
-  // Get the appropriate language extension based on the selected language
-  const getLanguageExtension = () => {
-    const langMap = {
-      'javascript': javascript(),
-      'python': python(),
-      'java': java(),
-      'cpp': cpp(),
-      'html': html(),
-      'css': css(),
-      'json': json(),
-      'markdown': markdown(),
-    };
-    
-    return langMap[language] || javascript();
-  };
-  
-  // Handle code changes and notify other users
-  const handleCodeChange = (value) => {
-    // Don't process remote changes coming back to us
-    if (codeChangeRef.current) {
-      return;
-    }
-    
-    // Update the local code state first for immediate feedback
-    setCode(value);
-    
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    
-    // Debounce to prevent too many updates
-    debounceTimeoutRef.current = setTimeout(() => {
-      // Only sync if we're connected and have a room
-      if (socketRef.current && socketRef.current.connected && roomId) {
-        const updateData = {
-          roomId,
-          code: value,
-          content: value,
-          sender: socketRef.current.id,
-          fileId: selectedFile?._id || null,
-          timestamp: Date.now()
-        };
-        
-        socketRef.current.emit('code-update', updateData);
-        socketRef.current.emit('code-change', updateData);
-        
-        console.log('Sent code update:', {
-          roomId,
-          codeLength: value.length,
-          fileId: selectedFile?._id || null
-        });
-        
-        // Update file content in the backend if we have a selected file
-        if (selectedFile) {
-          updateFileContent(selectedFile._id, value);
-        }
-      } else {
-        console.log('Not syncing code change - not connected or no room selected');
-      }
-    }, 500);
-  };
-  
-  // Helper to update file content in the backend
-  const updateFileContent = async (fileId, content) => {
-    if (!fileId) return;
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to update file content:', await response.text());
-      }
-    } catch (err) {
-      console.error('Error updating file content:', err);
-    }
-  };
-  
-  // Handle file selection from the file explorer
-  const handleFileSelect = (file) => {
-    setSelectedFile(file);
-  };
-  
-  // Copy room ID to clipboard
-  const copyRoomId = () => {
-    navigator.clipboard.writeText(roomId);
-    alert(`Room ID ${roomId} copied to clipboard!`);
-  };
-  
-  // Force reconnection to the server
-  const reconnect = () => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current.connect();
-    }
-    alert('Attempting to reconnect to server...');
-  };
-  
-  // Request an updated list of users in the room
-  const requestRoomUsers = () => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('get-room-users', { roomId });
-      console.log('Requested updated room users list');
-    } else {
-      alert('Not connected to server. Cannot request users list.');
-    }
-  };
-  
-  // Close the room and navigate back to main page
-  const closeRoom = async () => {
-    try {
-      // First show the save project modal if user is authenticated
-      const token = localStorage.getItem('token');
-      if (token) {
-        const userConfirmedSave = window.confirm('Do you want to save this project before closing?');
-        if (userConfirmedSave) {
-          setShowSaveModal(true);
-          return;
-        }
-      }
-      
-      await finishRoomClose();
-    } catch (error) {
-      console.error('Error closing room:', error);
-      alert('Failed to close room properly. Navigating back anyway.');
-      navigate('/');
-    }
-  };
-  
-  // Handle save project
-  const handleSaveProject = async () => {
-    if (!projectName.trim()) {
-      alert('Please enter a project name');
-      return;
-    }
-    
-    setIsSaving(true);
-    
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-      
-      // Get all files in the room
-      const filesResponse = await fetch(`${API_BASE_URL}/api/files/room/${roomId}`);
-      if (!filesResponse.ok) {
-        throw new Error('Failed to fetch files');
-      }
-      
-      const filesData = await filesResponse.json();
-      const files = filesData.files || [];
-      
-      // Save the project
-      const response = await axios.post(`${API_BASE_URL}/api/projects`, {
-        name: projectName,
-        description: projectDescription,
-        roomId,
-        files
-      }, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        withCredentials: true
-      });
-      
-      alert('Project saved successfully!');
-      
-      // Now close the room
-      await finishRoomClose();
-    } catch (error) {
-      console.error('Error saving project:', error);
-      alert('Failed to save project: ' + (error.response?.data?.error || error.message));
-      setIsSaving(false);
-    }
-  };
-  
-  // Cancel project save
-  const cancelSaveProject = () => {
-    setShowSaveModal(false);
-    setProjectName('');
-    setProjectDescription('');
-  };
-  
-  // Finish closing the room after deciding on save
-  const finishRoomClose = async () => {
-    try {
-      // Check if there is a backend API to close the room
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const response = await axios.post(`${API_BASE_URL}/api/rooms/${roomId}/close`, {}, {
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
-            withCredentials: true
-          });
-          
-          console.log('Room closed successfully:', response.data);
-        } catch (apiError) {
-          console.warn('API error when closing room:', apiError);
-          // Continue with closing even if the API call fails
-        }
-      }
-    } catch (error) {
-      console.error('Error closing room in backend:', error);
-    }
-    
-    // Disconnect socket
-    if (socketRef.current && socketRef.current.connected && roomId) {
-      console.log('Disconnecting socket from room:', roomId);
-      socketRef.current.emit('leave-room', { roomId });
-    }
-    
-    // Navigate back to main page
-    navigate('/');
-  };
-  
-  // Handle beforeunload to close room when user closes the window
+  // Add beforeunload handler to alert when closing
   useEffect(() => {
-    const handleBeforeUnload = async (e) => {
-      if (roomId) {
-        // Try to close the room
-        try {
-          const token = localStorage.getItem('token');
-          if (token) {
-            await axios.post(`${API_BASE_URL}/api/rooms/${roomId}/close`, {}, {
-              headers: {
-                Authorization: `Bearer ${token}`
-              },
-              withCredentials: true
-            });
-          }
-        } catch (error) {
-          console.error('Error closing room on window close:', error);
-        }
-      }
-    };
-
+    // Add event listener to handle closing the tab/window
     window.addEventListener('beforeunload', handleBeforeUnload);
     
+    // Clean up on unmount
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [roomId]);
+  }, []);
   
-  // Render the active tab content for mobile view
+  // Add function to fetch user profiles
+  const fetchUserProfiles = async (users) => {
+    try {
+      // Only fetch profiles for users that have a username
+      const usersToFetch = users
+        .filter(user => user.username)
+        .map(user => user.username);
+      
+      if (usersToFetch.length === 0) return;
+      
+      console.log('Fetching profiles for users:', usersToFetch);
+      
+      const response = await axios.post(`${API_BASE_URL}/api/users/profiles-by-username`, {
+        usernames: usersToFetch
+      });
+      
+      if (response.data && response.data.profiles) {
+        console.log('Received user profiles:', response.data.profiles);
+        
+        // Update the current users with their profile data
+        const updatedUsers = currentUsers.map(user => {
+          const profile = response.data.profiles.find(p => p.username === user.username);
+          
+          if (profile) {
+            return {
+              ...user,
+              profilePicture: profile.profilePicture
+            };
+          }
+          
+          return user;
+        });
+        
+        setCurrentUsers(updatedUsers);
+      }
+    } catch (error) {
+      console.error('Error fetching user profiles:', error);
+      // Don't update the state if there's an error, just continue with what we have
+    }
+  };
+  
+  // Helper function to get profile image URL
+  const getProfileImageUrl = (user) => {
+    // Check if user has a profile picture from the API
+    if (user.profilePicture) {
+      return getImageUrl(user.profilePicture);
+    }
+    
+    // Fallback to default image based on username (first letter)
+    const firstLetter = (user.username || 'A')[0].toUpperCase();
+    return `https://ui-avatars.com/api/?name=${firstLetter}&background=random&color=fff&bold=true`;
+  };
+  
+  // Function to render the current tab content on mobile
   const renderMobileTabContent = () => {
     switch (activeTab) {
-      case 'files':
+      case 'editor':
         return (
-          <div className="h-full overflow-y-auto">
-            <FileExplorer 
-              roomId={roomId}
-              onFileSelect={handleFileSelect}
-              selectedFile={selectedFile}
-            />
-          </div>
-        );
-      case 'terminal':
-        return <CodeTerminal code={code} language={language} autoRun={runCode} onRunComplete={() => setRunCode(false)} />;
-      case 'snippets':
-        return (
-          <CodeSnippetLibrary onSnippetSelect={(snippet) => {
-            const newCode = code + '\n\n' + snippet.code;
-            setCode(newCode);
-            
-            // Broadcast the code update to other users
-            if (socketRef.current && socketRef.current.connected && roomId) {
-              const updateData = {
-                roomId,
-                code: newCode,
-                content: newCode,
-                sender: socketRef.current.id,
-                fileId: selectedFile?._id,
-                timestamp: Date.now()
-              };
-              
-              socketRef.current.emit('code-update', updateData);
-              socketRef.current.emit('code-change', updateData);
-              
-              console.log('Sent code update with snippet');
-              
-              // Update file content in the backend
-              if (selectedFile) {
-                updateFileContent(selectedFile._id, newCode);
-              }
-            }
-            
-            // Switch back to editor after inserting snippet
-            setActiveTab('editor');
-          }} />
-        );
-      default: // 'editor'
-        return (
-          <div className="relative h-full">
+          <div className="h-full">
             <CodeMirror
               value={code}
               height="100%"
@@ -618,131 +367,298 @@ const EditorPage = () => {
                 lintKeymap: true,
               }}
             />
-            {/* Sticky Run Code Button - modified to execute code */}
-            <button
-              onClick={() => {
-                setActiveTab('terminal');
-                setRunCode(true);
-              }}
-              className="absolute bottom-6 right-6 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-full p-3 shadow-lg flex items-center justify-center"
-            >
-              <Play size={24} fill="white" />
-            </button>
           </div>
         );
+      case 'files':
+        return (
+          <FileExplorer 
+            roomId={roomId}
+            onFileSelect={handleFileSelect}
+            selectedFile={selectedFile}
+          />
+        );
+      case 'terminal':
+        return (
+          <CodeTerminal code={code} language={language} />
+        );
+      case 'snippets':
+        return (
+          <CodeSnippetLibrary onSnippetSelect={(snippet) => {
+            const newCode = code + '\n\n' + snippet.code;
+            setCode(newCode);
+            
+            // Broadcast the code update to other users
+            if (socketRef.current && socketRef.current.connected && roomId) {
+              const updateData = {
+                roomId,
+                code: newCode,
+                content: newCode,
+                sender: socketRef.current.id,
+                fileId: selectedFile?._id,
+                timestamp: Date.now()
+              };
+              
+              socketRef.current.emit('code-update', updateData);
+              socketRef.current.emit('code-change', updateData);
+              
+              console.log('Sent code update with snippet');
+              
+              // Update file content in the backend
+              if (selectedFile) {
+                updateFileContent(selectedFile._id, newCode);
+              }
+            }
+          }} />
+        );
+      default:
+        return null;
     }
   };
   
+  // Function to get the appropriate language extension for CodeMirror
+  const getLanguageExtension = () => {
+    switch (language) {
+      case 'javascript':
+        return javascript();
+      case 'python':
+        return python();
+      case 'java':
+        return java();
+      case 'cpp':
+        return cpp();
+      case 'html':
+        return html();
+      case 'css':
+        return css();
+      case 'json':
+        return json();
+      case 'markdown':
+        return markdown();
+      default:
+        return javascript(); // Default to JavaScript
+    }
+  };
+  
+  // Function to handle code changes in the editor
+  const handleCodeChange = (value) => {
+    // If the change event was triggered by a remote update, don't broadcast it
+    if (codeChangeRef.current) {
+      return;
+    }
+    
+    // Update local state
+    setCode(value);
+    
+    // Set up debounce for sending updates
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    debounceTimeoutRef.current = setTimeout(() => {
+      // Send update if socket is connected
+      if (socketRef.current && socketRef.current.connected && roomId) {
+        const updateData = {
+          roomId,
+          code: value,
+          content: value,
+          sender: socketRef.current.id,
+          fileId: selectedFile?._id,
+          timestamp: Date.now()
+        };
+        
+        socketRef.current.emit('code-update', updateData);
+        socketRef.current.emit('code-change', updateData);
+        
+        console.log('Sent code update');
+        
+        // Update file content in the backend
+        if (selectedFile) {
+          updateFileContent(selectedFile._id, value);
+        }
+      }
+    }, 500); // 500ms debounce
+  };
+  
+  // Function to update a file's content in the backend
+  const updateFileContent = async (fileId, content) => {
+    try {
+      await axios.put(`${API_BASE_URL}/api/files/${fileId}`, {
+        content,
+        roomId
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      console.log('File content updated in backend');
+    } catch (error) {
+      console.error('Error updating  content:', error);
+    }
+  };
+  
+  // Function to handle file selection
+  const handleFileSelect = (file) => {
+    setSelectedFile(file);
+    setCode(file.content || '');
+  };
+  
+  // Function to copy the room ID to clipboard
+  const copyRoomId = () => {
+    navigator.clipboard.writeText(roomId);
+    alert('Room ID copied to clipboard!');
+  };
+  
+  // Function to reconnect to the socket server
+  const reconnect = () => {
+    if (socketRef.current) {
+      socketRef.current.connect();
+    }
+  };
+  
+  // Function to request room users
+  const requestRoomUsers = () => {
+    if (socketRef.current && socketRef.current.connected) {
+      console.log('Requesting room users for room:', roomId);
+      socketRef.current.emit('get-room-users', { roomId });
+    } else {
+      console.log('Cannot request users: Socket not connected');
+    }
+  };
+  
+  // Function to handle closing the room
+  const closeRoom = async () => {
+    // Show confirmation
+    const isConfirmed = window.confirm('Are you sure you want to close this room? All unsaved changes will be lost.');
+    
+    if (isConfirmed) {
+      // Show save project modal if applicable
+      const shouldSave = window.confirm('Would you like to save this project before closing?');
+      
+      if (shouldSave) {
+        setShowSaveModal(true);
+      } else {
+        // Directly close the room without saving
+        await finishRoomClose();
+      }
+    }
+  };
+  
+  // Function to handle project save
+  const handleSaveProject = async () => {
+    if (!projectName.trim()) {
+      alert('Please enter a project name');
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      // Save the current code to the selected file if any
+      if (selectedFile) {
+        await updateFileContent(selectedFile._id, code);
+      }
+      
+      // Create project in backend
+      const response = await axios.post(`${API_BASE_URL}/api/projects`, {
+        name: projectName,
+        description: projectDescription,
+        roomId
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      console.log('Project saved:', response.data);
+      
+      setIsSaving(false);
+      setShowSaveModal(false);
+      
+      // Show success message
+      alert('Project saved successfully!');
+      
+      // Continue with room closure if applicable
+      await finishRoomClose();
+    } catch (error) {
+      console.error('Error saving project:', error);
+      setIsSaving(false);
+      alert(`Error saving project: ${error.response?.data?.message || error.message}`);
+    }
+  };
+  
+  // Function to cancel project save
+  const cancelSaveProject = () => {
+    setShowSaveModal(false);
+  };
+  
+  // Function to finish room closure proce
+  const finishRoomClose = async () => {
+    try {
+      // Clean up on server
+      await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      console.log('Room closed successfully');
+      
+      // Clean up socket
+      if (socketRef.current) {
+        if (socketRef.current.connected) {
+          socketRef.current.emit('leave-room', { roomId });
+        }
+        socketRef.current.disconnect();
+      }
+      
+      // Navigate to dashboard
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error closing room:', error);
+      
+      // Even if there's an error, still navigate away
+      navigate('/dashboard');
+    }
+  };
+  
+  // Function to handle beforeunload event
+  const handleBeforeUnload = async (e) => {
+    // Show a confirmation dialog to the user
+    const message = 'Are you sure you want to leave? Any unsaved changes will be lost.';
+    e.returnValue = message;
+    
+    return message;
+  };
+  
   return (
-    <div className="flex flex-col h-screen bg-[#0F0F13] text-white">
-      {/* Project Save Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#14141B] border border-[#2A2A3A] rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Save Project</h2>
-            <p className="text-[#8F8FA3] mb-6">Save your project to access it later from your dashboard.</p>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Project Name</label>
-                <input 
-                  type="text" 
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="w-full bg-[#1E1E29] border border-[#2A2A3A] rounded-md px-3 py-2 focus:outline-none focus:border-[#4D5DFE]"
-                  placeholder="Enter project name"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Description (optional)</label>
-                <textarea
-                  value={projectDescription}
-                  onChange={(e) => setProjectDescription(e.target.value)}
-                  className="w-full bg-[#1E1E29] border border-[#2A2A3A] rounded-md px-3 py-2 focus:outline-none focus:border-[#4D5DFE] h-24 resize-none"
-                  placeholder="Enter project description"
-                />
-              </div>
-            </div>
-            
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={cancelSaveProject}
-                className="flex-1 bg-[#1E1E29] hover:bg-[#2A2A3A] text-white py-2 rounded-md transition-colors"
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveProject}
-                className="flex-1 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white py-2 rounded-md transition-colors disabled:opacity-50"
-                disabled={isSaving}
-              >
-                {isSaving ? 'Saving...' : 'Save Project'}
-              </button>
-            </div>
-          </div>
+    <div className="flex flex-col h-screen bg-[#14141B] text-white">
+      {/* Header */}
+      <header className="bg-[#1E1E29] border-b border-[#2A2A3A] h-16 flex items-center px-4 justify-between">
+        {/* Mobile Menu Button */}
+        <div className="md:hidden">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-white"
+          >
+            <Menu size={24} />
+          </button>
         </div>
-      )}
-      
-      {/* Mobile Dropdown Menu */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 md:hidden">
-          <div className="bg-[#14141B] w-full p-4 border-b border-[#2A2A3A]">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Room Options</h2>
-              <button onClick={() => setIsMobileMenuOpen(false)} className="p-1">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  copyRoomId();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] p-3 rounded-md flex items-center"
+        
+        {/* Room Details and Actions */}
+        <div className="flex-1 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500' }`}></div>
+            
+            {!isConnected && (
+              <button 
+                onClick={reconnect}
+                className="text-[#4D5DFE] hover:text-[#3A4AE1]"
+                title="Reconnect"
               >
-                <Share2 className="h-5 w-5 mr-3" />
-                <span>Share Room</span>
+                <RefreshCw size={16} />
               </button>
-              <button
-                onClick={() => {
-                  requestRoomUsers();
-                  setShowUsers(true);
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] p-3 rounded-md flex items-center"
-              >
-                <Users className="h-5 w-5 mr-3" />
-                <span>View Users ({currentUsers.length})</span>
-              </button>
-              <button
-                onClick={() => {
-                  closeRoom();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full bg-[#E94560]/10 hover:bg-[#E94560]/20 text-[#E94560] p-3 rounded-md flex items-center"
-              >
-                <X className="h-5 w-5 mr-3" />
-                <span>Close Room</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Header with room info and users */}
-      <header className="bg-[#14141B] border-b border-[#2A2A3A] p-3">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-2 md:space-x-4">
-            {/* Mobile menu button */}
-            <button 
-              className="mr-2 p-1 md:hidden"
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
-              <Menu size={20} />
-            </button>
+            )}
             
             <h1 className="text-lg md:text-xl font-bold truncate max-w-[150px] md:max-w-none">
               {roomId}
@@ -772,12 +688,14 @@ const EditorPage = () => {
             {currentUsers.length > 0 && (
               <AnimatedTooltip 
                 size={45}
-                items={currentUsers.map(user => ({
-                  id: user.socketId || user.id || Math.random().toString(),
-                  name: user.username || 'Anonymous',
-                  designation: user.username === username ? '(you)' : '',
-                  image: user.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'User')}&background=random&size=100`
-                }))}
+                items={currentUsers.map(user => {
+                  return {
+                    id: user.socketId || user.id || Math.random().toString(),
+                    name: user.username || 'Anonymous',
+                    designation: user.username === username ? '(you)' : '',
+                    image: getProfileImageUrl(user)
+                  };
+                })}
               />
             )}
           </div>
@@ -886,57 +804,96 @@ const EditorPage = () => {
           </div>
         )}
         
-        {/* Mobile Tab Content */}
-        <div className="flex-1 overflow-hidden">
-          {renderMobileTabContent()}
-        </div>
+        {renderMobileTabContent()}
         
-        {/* Mobile Tab Navigation */}
-        <div className="bg-[#14141B] border-t border-[#2A2A3A] grid grid-cols-2 divide-x divide-[#2A2A3A]">
+        {/* Mobile Tabs Navigation */}
+        <div className="flex border-t border-[#2A2A3A] bg-[#14141B]">
           <button 
-            onClick={() => setActiveTab('files')} 
-            className={`flex flex-col items-center justify-center py-3 ${activeTab === 'files' ? 'text-[#4D5DFE]' : 'text-[#8F8FA3]'}`}
+            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'editor' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
+            onClick={() => setActiveTab('editor')}
           >
-            <FileText size={20} className="mb-1" />
-            <span className="text-xs">Files</span>
+            <Code size={20} />
+            <span className="text-xs mt-1">Editor</span>
           </button>
           <button 
-            onClick={() => setActiveTab('editor')} 
-            className={`flex flex-col items-center justify-center py-3 ${activeTab === 'editor' ? 'text-[#4D5DFE]' : 'text-[#8F8FA3]'}`}
+            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'files' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
+            onClick={() => setActiveTab('files')}
           >
-            <Code size={20} className="mb-1" />
-            <span className="text-xs">Editor</span>
+            <FileText size={20} />
+            <span className="text-xs mt-1">Files</span>
+          </button>
+          <button 
+            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'terminal' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
+            onClick={() => setActiveTab('terminal')}
+          >
+            <Terminal size={20} />
+            <span className="text-xs mt-1">Terminal</span>
+          </button>
+          <button 
+            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'snippets' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
+            onClick={() => setActiveTab('snippets')}
+          >
+            <Code size={20} />
+            <span className="text-xs mt-1">Snippets</span>
           </button>
         </div>
       </div>
       
-      {/* Desktop Bottom Action Bar */}
-      <div className="hidden md:flex bg-[#14141B] border-t border-[#2A2A3A] p-2 justify-between">
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setShowExplorer(!showExplorer)}
-            className={`px-3 py-1 rounded text-sm transition-colors ${showExplorer ? 'bg-[#4D5DFE] hover:bg-[#3A4AE1]' : 'bg-[#1E1E29] hover:bg-[#2A2A3A]'}`}
-          >
-            File Explorer
-          </button>
-          <button
-            onClick={() => setShowSnippets(!showSnippets)}
-            className={`px-3 py-1 rounded text-sm transition-colors ${showSnippets ? 'bg-[#4D5DFE] hover:bg-[#3A4AE1]' : 'bg-[#1E1E29] hover:bg-[#2A2A3A]'}`}
-          >
-            Code Snippets
-          </button>
+      {/* Project Save Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1E1E29] rounded-lg shadow-lg max-w-md w-full p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Save Project</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Project Name</label>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#14141B] border border-[#2A2A3A] rounded-md text-white"
+                  placeholder="Enter project name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Description (optional)</label>
+                <textarea
+                  value={projectDescription}
+                  onChange={(e) => setProjectDescription(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#14141B] border border-[#2A2A3A] rounded-md text-white h-24"
+                  placeholder="Describe your project"
+                ></textarea>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={cancelSaveProject}
+                  className="px-4 py-2 bg-[#2A2A3A] text-white rounded-md hover:bg-[#3A3A4A]"
+                  disabled={isSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveProject}
+                  className="px-4 py-2 bg-[#4D5DFE] text-white rounded-md hover:bg-[#3D4DF0] flex items-center"
+                  disabled={isSaving || !projectName.trim()}
+                >
+                  {isSaving ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Project'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={() => {
-            setShowTerminal(true);
-            setRunCode(true);
-          }}
-          className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-3 py-1 rounded-md text-sm flex items-center transition-colors"
-        >
-          <Play size={16} className="mr-1" fill="white" />
-          Run Code
-        </button>
-      </div>
+      )}
     </div>
   );
 };
