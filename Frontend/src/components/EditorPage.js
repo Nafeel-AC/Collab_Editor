@@ -12,8 +12,9 @@ import { css } from '@codemirror/lang-css';
 import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import { githubDark } from '@uiw/codemirror-theme-github';
-import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle, FileText, Terminal, Code, Menu, Play } from 'lucide-react';
+import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle, FileText, Terminal, Code, Menu, Play, RefreshCw } from 'lucide-react';
 import axios from 'axios';
+import { AnimatedTooltip } from './ui/animated-tooltip';
 
 import FileExplorer from './FileExplorer';
 import CodeTerminal from './CodeTerminal';
@@ -223,6 +224,21 @@ const EditorPage = () => {
       }
     };
   }, [roomId, username]);
+  
+  // Add a new useEffect to periodically refresh the user list
+  useEffect(() => {
+    // Initial user request
+    requestRoomUsers();
+    
+    // Set up an interval to refresh the users list every 30 seconds
+    const intervalId = setInterval(() => {
+      if (socketRef.current && socketRef.current.connected) {
+        requestRoomUsers();
+      }
+    }, 30000);
+    
+    return () => clearInterval(intervalId);
+  }, [roomId]);
   
   // Handle file selection
   useEffect(() => {
@@ -751,52 +767,18 @@ const EditorPage = () => {
             </div>
           </div>
           
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowUsers(!showUsers);
-                if (!showUsers) {
-                  requestRoomUsers();
-                }
-              }}
-              className="bg-[#1E1E29] hover:bg-[#2A2A3A] px-2 py-1 md:px-3 rounded-md flex items-center transition-colors"
-            >
-              <Users className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">{currentUsers.length} {currentUsers.length === 1 ? 'User' : 'Users'}</span>
-              <span className="md:hidden">{currentUsers.length}</span>
-            </button>
-            
-            {showUsers && (
-              <div className="absolute right-0 mt-2 w-56 bg-[#14141B] border border-[#2A2A3A] rounded-md shadow-lg z-10">
-                <div className="p-2 border-b border-[#2A2A3A] flex justify-between items-center">
-                  <h3 className="text-sm font-medium">Users in this room</h3>
-                  <button 
-                    onClick={() => {
-                      requestRoomUsers();
-                      if (isMobile()) {
-                        setShowUsers(false);
-                      }
-                    }}
-                    className="text-xs text-[#4D5DFE] hover:text-[#3A4AE1]"
-                    title="Refresh users list"
-                  >
-                    Refresh
-                  </button>
-                </div>
-                <ul className="max-h-60 overflow-y-auto">
-                  {currentUsers && currentUsers.length > 0 ? (
-                    currentUsers.map((user, index) => (
-                      <li key={index} className="px-3 py-2 hover:bg-[#1E1E29] flex items-center">
-                        <div className="h-2 w-2 rounded-full bg-[#4ADE80] mr-2" />
-                        <span>{user.username || 'Anonymous'}</span>
-                        {user.username === username && <span className="ml-2 text-xs text-[#8F8FA3]">(you)</span>}
-                      </li>
-                    ))
-                  ) : (
-                    <li className="px-3 py-2 text-[#8F8FA3]">No other users in this room</li>
-                  )}
-                </ul>
-              </div>
+          {/* AnimatedTooltip for users directly in the header */}
+          <div className="flex-1 flex justify-center items-center">
+            {currentUsers.length > 0 && (
+              <AnimatedTooltip 
+                size={45}
+                items={currentUsers.map(user => ({
+                  id: user.socketId || user.id || Math.random().toString(),
+                  name: user.username || 'Anonymous',
+                  designation: user.username === username ? '(you)' : '',
+                  image: user.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'User')}&background=random&size=100`
+                }))}
+              />
             )}
           </div>
         </div>
