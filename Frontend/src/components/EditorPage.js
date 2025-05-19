@@ -577,6 +577,945 @@ const EditorPage = () => {
     }
   }, [isConnected, currentUsers.length]);
   
+  // Modify the getProfileImageUrl function to not rely on backend API
+  const getProfileImageUrl = (user) => {
+    console.log("Getting profile image for user:", user);
+    
+    // Generate a consistent avatar for each user
+    // By using the username as the seed, the same user will always get the same avatar
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'User')}&background=random&size=200&length=1`;
+  };
+  
+  // Render the active tab content for mobile view
+  const renderMobileTabContent = () => {
+    switch (activeTab) {
+      case 'files':
+        return (
+          <div className="h-full overflow-y-auto">
+            <FileExplorer 
+              roomId={roomId}
+              onFileSelect={handleFileSelect}
+              selectedFile={selectedFile}
+            />
+          </div>
+        );
+      case 'terminal':
+        return <CodeTerminal code={code} language={language} autoRun={runCode} onRunComplete={() => setRunCode(false)} />;
+      case 'snippets':
+        return (
+          <CodeSnippetLibrary onSnippetSelect={(snippet) => {
+            const newCode = code + '\n\n' + snippet.code;
+            setCode(newCode);
+            
+            // Broadcast the code update to other users
+            if (socketRef.current && socketRef.current.connected && roomId) {
+              const updateData = {
+                roomId,
+                code: newCode,
+                content: newCode,
+                sender: socketRef.current.id,
+                fileId: selectedFile?._id,
+                timestamp: Date.now()
+              };
+              
+              socketRef.current.emit('code-update', updateData);
+              socketRef.current.emit('code-change', updateData);
+              
+              console.log('Sent code update with snippet');
+              
+              // Update file content in the backend
+              if (selectedFile) {
+                updateFileContent(selectedFile._id, newCode);
+              }
+            }
+            
+            // Switch back to editor after inserting snippet
+            setActiveTab('editor');
+          }} />
+        );
+      default: // 'editor'
+        return (
+          <div className="relative h-full">
+            <CodeMirror
+              value={code}
+              height="100%"
+              theme={githubDark}
+              extensions={[getLanguageExtension()]}
+              onChange={handleCodeChange}
+              basicSetup={{
+                lineNumbers: true,
+                highlightActiveLineGutter: true,
+                highlightSpecialChars: true,
+                history: true,
+                foldGutter: true,
+                drawSelection: true,
+                dropCursor: true,
+                allowMultipleSelections: true,
+                indentOnInput: true,
+                syntaxHighlighting: true,
+                bracketMatching: true,
+                closeBrackets: true,
+                autocompletion: true,
+                rectangularSelection: true,
+                crosshairCursor: true,
+                highlightActiveLine: true,
+                highlightSelectionMatches: true,
+                closeBracketsKeymap: true,
+                defaultKeymap: true,
+                searchKeymap: true,
+                historyKeymap: true,
+                foldKeymap: true,
+                completionKeymap: true,
+                lintKeymap: true,
+              }}
+            />
+            {/* Sticky Run Code Button - modified to execute code */}
+            <button
+              onClick={() => {
+                setActiveTab('terminal');
+                setRunCode(true);
+              }}
+              className="absolute bottom-6 right-6 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-full p-3 shadow-lg flex items-center justify-center"
+            >
+              <Play size={24} fill="white" />
+            </button>
+          </div>
+        );
+    }
+  };
+  
+  return (
+    <div className="flex flex-col h-screen bg-[#0F0F13] text-white">
+      {/* Project Save Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#14141B] border border-[#2A2A3A] rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Save Project</h2>
+            <p className="text-[#8F8FA3] mb-6">Save your project to access it later from your dashboard.</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Project Name</label>
+                <input 
+                  type="text" 
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="w-full bg-[#1E1E29] border border-[#2A2A3A] rounded-md px-3 py-2 focus:outline-none focus:border-[#4D5DFE]"
+                  placeholder="Enter project name"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Description (optional)</label>
+                <textarea
+                  value={projectDescription}
+                  onChange={(e) => setProjectDescription(e.target.value)}
+                  className="w-full bg-[#1E1E29] border border-[#2A2A3A] rounded-md px-3 py-2 focus:outline-none focus:border-[#4D5DFE] h-24 resize-none"
+                  placeholder="Enter project description"
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={cancelSaveProject}
+                className="flex-1 bg-[#1E1E29] hover:bg-[#2A2A3A] text-white py-2 rounded-md transition-colors"
+                disabled={isSaving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveProject}
+                className="flex-1 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white py-2 rounded-md transition-colors disabled:opacity-50"
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save Project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Mobile Dropdown Menu */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 md:hidden">
+          <div className="bg-[#14141B] w-full p-4 border-b border-[#2A2A3A]">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Room Options</h2>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="p-1">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  copyRoomId();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] p-3 rounded-md flex items-center"
+              >
+                <Share2 className="h-5 w-5 mr-3" />
+                <span>Share Room</span>
+              </button>
+              <button
+                onClick={() => {
+                  requestRoomUsers();
+                  setShowUsers(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] p-3 rounded-md flex items-center"
+              >
+                <Users className="h-5 w-5 mr-3" />
+                <span>View Users ({currentUsers.length})</span>
+              </button>
+              <button
+                onClick={() => {
+                  closeRoom();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full bg-[#E94560]/10 hover:bg-[#E94560]/20 text-[#E94560] p-3 rounded-md flex items-center"
+              >
+                <X className="h-5 w-5 mr-3" />
+                <span>Close Room</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Header with room info and users */}
+      <header className="bg-[#14141B] border-b border-[#2A2A3A] p-3">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-2 md:space-x-4">
+            {/* Mobile menu button */}
+            <button 
+              className="mr-2 p-1 md:hidden"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            
+            <h1 className="text-lg md:text-xl font-bold truncate max-w-[150px] md:max-w-none">
+              {roomId}
+            </h1>
+            
+            {/* Desktop buttons */}
+            <div className="hidden md:flex items-center space-x-2">
+              <button
+                onClick={copyRoomId}
+                className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </button>
+              <button
+                onClick={closeRoom}
+                className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Close
+              </button>
+            </div>
+          </div>
+          
+          {/* AnimatedTooltip for users directly in the header */}
+          <div className="flex-1 flex justify-center items-center">
+            {currentUsers.length > 0 && (
+              <AnimatedTooltip 
+                size={45}
+                items={currentUsers.map(user => {
+                  console.log(`Processing user ${user.username} for display`);
+                  return {
+                    id: user.socketId || user.id || Math.random().toString(),
+                    name: user.username || 'Anonymous',
+                    designation: user.username === username ? '(you)' : '',
+                    image: getProfileImageUrl(user)
+                  };
+                })}
+              />
+            )}
+          </div>
+        </div>
+      </header>
+      
+      {/* Desktop Layout */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
+        {/* File Explorer */}
+        {showExplorer && (
+          <div className="w-64 border-r border-[#2A2A3A] flex-shrink-0 overflow-y-auto bg-[#14141B]">
+            <FileExplorer 
+              roomId={roomId}
+              onFileSelect={handleFileSelect}
+              selectedFile={selectedFile}
+            />
+          </div>
+        )}
+        
+        <div className="flex-1 flex flex-col">
+          {/* Main Editor Area */}
+          <div className="flex-1 overflow-hidden">
+            <CodeMirror
+              value={code}
+              height="100%"
+              theme={githubDark}
+              extensions={[getLanguageExtension()]}
+              onChange={handleCodeChange}
+              basicSetup={{
+                lineNumbers: true,
+                highlightActiveLineGutter: true,
+                highlightSpecialChars: true,
+                history: true,
+                foldGutter: true,
+                drawSelection: true,
+                dropCursor: true,
+                allowMultipleSelections: true,
+                indentOnInput: true,
+                syntaxHighlighting: true,
+                bracketMatching: true,
+                closeBrackets: true,
+                autocompletion: true,
+                rectangularSelection: true,
+                crosshairCursor: true,
+                highlightActiveLine: true,
+                highlightSelectionMatches: true,
+                closeBracketsKeymap: true,
+                defaultKeymap: true,
+                searchKeymap: true,
+                historyKeymap: true,
+                foldKeymap: true,
+                completionKeymap: true,
+                lintKeymap: true,
+              }}
+            />
+          </div>
+          
+          {/* Terminal */}
+          {showTerminal && (
+            <CodeTerminal code={code} language={language} autoRun={runCode} onRunComplete={() => setRunCode(false)} />
+          )}
+        </div>
+        
+        {/* Code Snippet Library */}
+        {showSnippets && (
+          <div className="w-80 border-l border-[#2A2A3A] flex-shrink-0 overflow-y-auto bg-[#14141B]">
+            <CodeSnippetLibrary onSnippetSelect={(snippet) => {
+              const newCode = code + '\n\n' + snippet.code;
+              setCode(newCode);
+              
+              // Broadcast the code update to other users
+              if (socketRef.current && socketRef.current.connected && roomId) {
+                const updateData = {
+                  roomId,
+                  code: newCode,
+                  content: newCode,
+                  sender: socketRef.current.id,
+                  fileId: selectedFile?._id,
+                  timestamp: Date.now()
+                };
+                
+                socketRef.current.emit('code-update', updateData);
+                socketRef.current.emit('code-change', updateData);
+                
+                console.log('Sent code update with snippet');
+                
+                // Update file content in the backend
+                if (selectedFile) {
+                  updateFileContent(selectedFile._id, newCode);
+                }
+              }
+            }} />
+          </div>
+        )}
+      </div>
+      
+      {/* Mobile Layout with Tabs */}
+      <div className="md:hidden flex flex-col flex-1 overflow-hidden">
+        {/* Mobile file name indicator */}
+        {selectedFile && (
+          <div className="bg-[#1E1E29] px-4 py-2 text-sm truncate border-b border-[#2A2A3A]">
+            <div className="flex items-center">
+              <FileText size={14} className="mr-2 text-[#4D5DFE]" />
+              <span className="truncate">{selectedFile.name}</span>
+            </div>
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import io from 'socket.io-client';
+import { API_BASE_URL, getImageUrl } from '../config/api.config';
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { python } from '@codemirror/lang-python';
+import { java } from '@codemirror/lang-java';
+import { cpp } from '@codemirror/lang-cpp';
+import { html } from '@codemirror/lang-html';
+import { css } from '@codemirror/lang-css';
+import { json } from '@codemirror/lang-json';
+import { markdown } from '@codemirror/lang-markdown';
+import { githubDark } from '@uiw/codemirror-theme-github';
+import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle, FileText, Terminal, Code, Menu, Play, RefreshCw } from 'lucide-react';
+import axios from 'axios';
+import { AnimatedTooltip } from './ui/animated-tooltip';
+
+import FileExplorer from './FileExplorer';
+import CodeTerminal from './CodeTerminal';
+import CodeSnippetLibrary from './CodeSnippetLibrary';
+
+const EditorPage = () => {
+  const { roomId } = useParams();
+  const location = useLocation();
+  const username = location.state?.username || localStorage.getItem('userName') || 'Anonymous';
+  const navigate = useNavigate();
+  
+  const [code, setCode] = useState('// Start coding here');
+  const [language, setLanguage] = useState('javascript');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [currentUsers, setCurrentUsers] = useState([]);
+  const [showUsers, setShowUsers] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(true);
+  const [showExplorer, setShowExplorer] = useState(true);
+  const [showSnippets, setShowSnippets] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [runCode, setRunCode] = useState(false);
+  
+  // State for mobile responsive tabbed interface
+  const [activeTab, setActiveTab] = useState('editor'); // 'editor', 'files', 'terminal', 'snippets'
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Function to check if we're on mobile
+  const isMobile = () => window.innerWidth < 768;
+
+  // Add resize listener to update view on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (!isMobile()) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial check
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
+  // Add state for project save modal
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const socketRef = useRef(null);
+  const codeChangeRef = useRef(false);
+  const debounceTimeoutRef = useRef(null);
+  
+  // Store username in localStorage for persistence
+  useEffect(() => {
+    if (location.state?.username) {
+      localStorage.setItem('lastEditorUsername', location.state.username);
+    }
+  }, [location.state?.username]);
+  
+  // Initialize socket connection
+  useEffect(() => {
+    // Clean up previous socket if it exists
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+
+    console.log('Connecting to socket server...');
+    
+    // Connect to WebSocket server
+    // Get authentication token
+    const token = localStorage.getItem('token');
+    
+    socketRef.current = io(API_BASE_URL, {
+      withCredentials: true,
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      auth: {
+        token: token
+      },
+      timeout: 10000 // Add a longer timeout
+    });
+    
+    // Handle connection events
+    socketRef.current.on('connect', () => {
+      console.log('Connected to server with socket ID:', socketRef.current.id);
+      setIsConnected(true);
+      
+      // Join the room
+      socketRef.current.emit('join-room', { 
+        roomId, 
+        username,
+        token // Pass the token for authentication
+      });
+      
+      console.log('Joined room:', roomId, 'as', username);
+      
+      // Request users immediately after joining
+      setTimeout(() => {
+        requestRoomUsers();
+      }, 1000);
+    });
+    
+    // Handle connection error
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      setIsConnected(false);
+      
+      // Try to connect again after a delay
+      setTimeout(() => {
+        console.log('Attempting to reconnect...');
+        socketRef.current.connect();
+      }, 3000);
+    });
+    
+    // Handle disconnection
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('Disconnected from server:', reason);
+      setIsConnected(false);
+    });
+    
+    // Handle room users update
+    socketRef.current.on('room-users', (users) => {
+      console.log('Room users updated:', users);
+      if (Array.isArray(users)) {
+        // Debug what profile data we're getting
+        users.forEach(user => {
+          console.log(`User ${user.username} profile data:`, user);
+        });
+        setCurrentUsers(users);
+      } else {
+        console.error('Received non-array users data:', users);
+        setCurrentUsers([]);
+      }
+    });
+    
+    // Define the remote code update handler
+    const handleRemoteCodeUpdate = (data) => {
+      console.log('Received code update:', {
+        from: data.sender,
+        myId: socketRef.current?.id,
+        codeLength: (data.code || data.content || '').length
+      });
+      
+      // Check if this update is from another user (not our own echo)
+      if (data.sender !== socketRef.current?.id) {
+        console.log('Applying remote code update');
+        
+        // Prevent our own change handler from firing due to this remote update
+        codeChangeRef.current = true;
+        
+        // Update code editor with the received content
+        setCode(data.code || data.content || '');
+        
+        // Reset flag after a short delay to ensure the UI has updated
+        setTimeout(() => {
+          codeChangeRef.current = false;
+        }, 50);
+        
+        // Update file content in the backend if this change matches the currently selected file
+        if (data.fileId && selectedFile && data.fileId === selectedFile._id) {
+          updateFileContent(data.fileId, data.code || data.content);
+        }
+      } else {
+        console.log('Ignoring my own code update echo');
+      }
+    };
+    
+    // Listen for both event names (code-update and code-change) for compatibility
+    socketRef.current.on('code-update', handleRemoteCodeUpdate);
+    socketRef.current.on('code-change', handleRemoteCodeUpdate);
+    
+    // Handle language changes
+    socketRef.current.on('language-change', (data) => {
+      console.log('Language changed to:', data.language);
+      // Only process updates from other users
+      if (data.sender !== socketRef.current.id) {
+        setLanguage(data.language);
+      }
+    });
+    
+    // Handle errors
+    socketRef.current.on('error', (error) => {
+      console.error('Socket error:', error);
+      alert(`Connection error: ${error.message}`);
+    });
+    
+    // Load initial document
+    socketRef.current.on('load-document', (content) => {
+      console.log('Loaded document:', content);
+      setCode(content || '// Start coding here');
+    });
+    
+    // Clean up on unmount
+    return () => {
+      console.log('Cleaning up socket connection');
+      // Cancel any pending debounce
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      
+      if (socketRef.current) {
+        // Leave room before disconnecting
+        if (socketRef.current.connected) {
+          console.log(`Leaving room: ${roomId}`);
+          socketRef.current.emit('leave-room', { roomId });
+        }
+        
+        // Remove all listeners
+        socketRef.current.off('code-update');
+        socketRef.current.off('code-change');
+        socketRef.current.off('room-users');
+        socketRef.current.off('language-change');
+        socketRef.current.off('load-document');
+        socketRef.current.off('error');
+        
+        // Disconnect the socket
+        socketRef.current.disconnect();
+      }
+    };
+  }, [roomId, username]);
+  
+  // Add a new useEffect to periodically refresh the user list
+  useEffect(() => {
+    // Initial user request
+    requestRoomUsers();
+    
+    // Set up an interval to refresh the users list every 30 seconds
+    const intervalId = setInterval(() => {
+      if (socketRef.current && socketRef.current.connected) {
+        requestRoomUsers();
+      }
+    }, 30000);
+    
+    return () => clearInterval(intervalId);
+  }, [roomId]);
+  
+  // Handle file selection
+  useEffect(() => {
+    if (selectedFile && selectedFile.type === 'file') {
+      console.log('Selected file:', selectedFile.name);
+      setCode(selectedFile.content || '// Empty file');
+      
+      // Determine language based on file extension
+      const extension = selectedFile.name.split('.').pop().toLowerCase();
+      const langMap = {
+        'js': 'javascript',
+        'jsx': 'javascript',
+        'ts': 'javascript',
+        'tsx': 'javascript',
+        'py': 'python',
+        'java': 'java',
+        'cpp': 'cpp',
+        'c': 'cpp',
+        'h': 'cpp',
+        'html': 'html',
+        'css': 'css',
+        'json': 'json',
+        'md': 'markdown',
+      };
+      
+      const newLanguage = langMap[extension] || 'javascript';
+      setLanguage(newLanguage);
+      
+      // Notify others of language change if connected
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('language-change', {
+          roomId,
+          language: newLanguage,
+          fileId: selectedFile._id,
+          sender: socketRef.current.id
+        });
+      }
+      
+      // Switch to editor tab on mobile after selecting a file
+      if (isMobile()) {
+        setActiveTab('editor');
+      }
+    }
+  }, [selectedFile, roomId]);
+  
+  // Get the appropriate language extension based on the selected language
+  const getLanguageExtension = () => {
+    const langMap = {
+      'javascript': javascript(),
+      'python': python(),
+      'java': java(),
+      'cpp': cpp(),
+      'html': html(),
+      'css': css(),
+      'json': json(),
+      'markdown': markdown(),
+    };
+    
+    return langMap[language] || javascript();
+  };
+  
+  // Handle code changes and notify other users
+  const handleCodeChange = (value) => {
+    // Don't process remote changes coming back to us
+    if (codeChangeRef.current) {
+      return;
+    }
+    
+    // Update the local code state first for immediate feedback
+    setCode(value);
+    
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    // Debounce to prevent too many updates
+    debounceTimeoutRef.current = setTimeout(() => {
+      // Only sync if we're connected and have a room
+      if (socketRef.current && socketRef.current.connected && roomId) {
+        const updateData = {
+          roomId,
+          code: value,
+          content: value,
+          sender: socketRef.current.id,
+          fileId: selectedFile?._id || null,
+          timestamp: Date.now()
+        };
+        
+        socketRef.current.emit('code-update', updateData);
+        socketRef.current.emit('code-change', updateData);
+        
+        console.log('Sent code update:', {
+          roomId,
+          codeLength: value.length,
+          fileId: selectedFile?._id || null
+        });
+        
+        // Update file content in the backend if we have a selected file
+        if (selectedFile) {
+          updateFileContent(selectedFile._id, value);
+        }
+      } else {
+        console.log('Not syncing code change - not connected or no room selected');
+      }
+    }, 500);
+  };
+  
+  // Helper to update file content in the backend
+  const updateFileContent = async (fileId, content) => {
+    if (!fileId) return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to update file content:', await response.text());
+      }
+    } catch (err) {
+      console.error('Error updating file content:', err);
+    }
+  };
+  
+  // Handle file selection from the file explorer
+  const handleFileSelect = (file) => {
+    setSelectedFile(file);
+  };
+  
+  // Copy room ID to clipboard
+  const copyRoomId = () => {
+    navigator.clipboard.writeText(roomId);
+    alert(`Room ID ${roomId} copied to clipboard!`);
+  };
+  
+  // Force reconnection to the server
+  const reconnect = () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current.connect();
+    }
+    alert('Attempting to reconnect to server...');
+  };
+  
+  // Modify the requestRoomUsers function to handle connection issues
+  const requestRoomUsers = () => {
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('get-room-users', { roomId });
+      console.log('Requested updated room users list');
+    } else {
+      console.warn('Not connected to server. Cannot request users list. Attempting reconnection...');
+      
+      // If socket exists but not connected, try to reconnect
+      if (socketRef.current) {
+        socketRef.current.connect();
+        
+        // After a short delay, try again
+        setTimeout(() => {
+          if (socketRef.current && socketRef.current.connected) {
+            socketRef.current.emit('get-room-users', { roomId });
+            console.log('Retried requesting room users after reconnection');
+          }
+        }, 2000);
+      }
+    }
+  };
+  
+  // Close the room and navigate back to main page
+  const closeRoom = async () => {
+    try {
+      // First show the save project modal if user is authenticated
+      const token = localStorage.getItem('token');
+      if (token) {
+        const userConfirmedSave = window.confirm('Do you want to save this project before closing?');
+        if (userConfirmedSave) {
+          setShowSaveModal(true);
+          return;
+        }
+      }
+      
+      await finishRoomClose();
+    } catch (error) {
+      console.error('Error closing room:', error);
+      alert('Failed to close room properly. Navigating back anyway.');
+      navigate('/');
+    }
+  };
+  
+  // Handle save project
+  const handleSaveProject = async () => {
+    if (!projectName.trim()) {
+      alert('Please enter a project name');
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Get all files in the room
+      const filesResponse = await fetch(`${API_BASE_URL}/api/files/room/${roomId}`);
+      if (!filesResponse.ok) {
+        throw new Error('Failed to fetch files');
+      }
+      
+      const filesData = await filesResponse.json();
+      const files = filesData.files || [];
+      
+      // Save the project
+      const response = await axios.post(`${API_BASE_URL}/api/projects`, {
+        name: projectName,
+        description: projectDescription,
+        roomId,
+        files
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
+      
+      alert('Project saved successfully!');
+      
+      // Now close the room
+      await finishRoomClose();
+    } catch (error) {
+      console.error('Error saving project:', error);
+      alert('Failed to save project: ' + (error.response?.data?.error || error.message));
+      setIsSaving(false);
+    }
+  };
+  
+  // Cancel project save
+  const cancelSaveProject = () => {
+    setShowSaveModal(false);
+    setProjectName('');
+    setProjectDescription('');
+  };
+  
+  // Finish closing the room after deciding on save
+  const finishRoomClose = async () => {
+    try {
+      // Check if there is a backend API to close the room
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const response = await axios.post(`${API_BASE_URL}/api/rooms/${roomId}/close`, {}, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            withCredentials: true
+          });
+          
+          console.log('Room closed successfully:', response.data);
+        } catch (apiError) {
+          console.warn('API error when closing room:', apiError);
+          // Continue with closing even if the API call fails
+        }
+      }
+    } catch (error) {
+      console.error('Error closing room in backend:', error);
+    }
+    
+    // Disconnect socket
+    if (socketRef.current && socketRef.current.connected && roomId) {
+      console.log('Disconnecting socket from room:', roomId);
+      socketRef.current.emit('leave-room', { roomId });
+    }
+    
+    // Navigate back to main page
+    navigate('/');
+  };
+  
+  // Handle beforeunload to close room when user closes the window
+  useEffect(() => {
+    const handleBeforeUnload = async (e) => {
+      if (roomId) {
+        // Try to close the room
+        try {
+          const token = localStorage.getItem('token');
+          if (token) {
+            await axios.post(`${API_BASE_URL}/api/rooms/${roomId}/close`, {}, {
+              headers: {
+                Authorization: `Bearer ${token}`
+              },
+              withCredentials: true
+            });
+          }
+        } catch (error) {
+          console.error('Error closing room on window close:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [roomId]);
+  
+  // Add a new useEffect to ensure we manually request room users if we don't get them automatically
+  useEffect(() => {
+    // If we're connected but have no users after 3 seconds, request the users list
+    if (isConnected && currentUsers.length === 0) {
+      const timeoutId = setTimeout(() => {
+        console.log("No users received automatically, manually requesting users list");
+        requestRoomUsers();
+      }, 3000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isConnected, currentUsers.length]);
+  
   // Add state to store user profiles
   const [userProfiles, setUserProfiles] = useState({});
   
@@ -636,13 +1575,21 @@ const EditorPage = () => {
     }
   }, [currentUsers]);
   
-  // Modified getProfileImageUrl to work without requiring a backend API call
+  // Modify getProfileImageUrl to use the cached profile data
   const getProfileImageUrl = (user) => {
     if (!user) return null;
     
-    // Generate unique, consistent avatars based on username
-    // This will create a distinct, colorful avatar for each user without needing profile pics
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'User')}&background=random&size=200&bold=true&length=2&format=svg&seed=${user.username}`;
+    // Try to get the profile from our cache
+    const cachedProfile = user.username ? userProfiles[user.username] : null;
+    
+    // If we have a cached profile with profilePic, use it
+    if (cachedProfile && cachedProfile.profilePic) {
+      console.log(`Using cached profile pic for ${user.username}:`, cachedProfile.profilePic);
+      return cachedProfile.profilePic;
+    }
+    
+    // Otherwise generate a unique avatar
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'User')}&background=random&size=200&seed=${user.socketId}`;
   };
   
   // Render the active tab content for mobile view

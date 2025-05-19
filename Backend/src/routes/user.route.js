@@ -19,7 +19,8 @@ import {
     deleteUser,
     toggleAdminStatus,
     getAllRegisteredUsers,
-    checkProfilePicMigration
+    checkProfilePicMigration,
+    getProfilesByUsername
 } from "../controllers/user.controller.js";
 import { verifyToken, isAdmin } from "../middlewares/auth.middleware.js";
 import loggingUpload from "../middlewares/upload.middleware.js";
@@ -70,5 +71,8 @@ router.route("/reject-friend-request").post(verifyToken, rejectFriendRequest);
 
 // Debug endpoints
 router.route("/check-friendship").get(verifyToken, checkFriendshipStatus);
+
+// Add the new route for getting profiles by username
+router.route("/profiles-by-username").post(verifyToken, getProfilesByUsername);
 
 export default router;
