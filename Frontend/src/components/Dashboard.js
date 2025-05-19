@@ -1759,7 +1759,7 @@ function Dashboard() {
     }
   };
 
-    // Friends are now managed by state
+  // Friends are now managed by state
 
   return (
     <div className="min-h-screen bg-[#0F0F13] text-white relative overflow-hidden">
@@ -1834,7 +1834,7 @@ function Dashboard() {
             <button 
                 onClick={() => handleNavigation('projects')}
                 className={`w-full flex items-center p-3 mb-2 rounded-md transition-colors ${mainContent === 'projects' ? 'bg-[#4D5DFE]/10 text-[#4D5DFE]' : 'hover:bg-[#1E1E29]/60'}`}
-            >
+          >
                 <Folder size={18} className="mr-3" />
                 <span>Projects</span>
             </button>
@@ -1870,15 +1870,15 @@ function Dashboard() {
                   >
                     <Bell size={18} className="mr-3" />
                     <span>Friend Requests</span>
-                    {friendRequests.length > 0 && (
+                {friendRequests.length > 0 && (
                       <span className="ml-2 bg-[#4D5DFE] text-white text-xs px-2 py-0.5 rounded-full">
-                        {friendRequests.length}
-                      </span>
-                    )}
-                  </button>
+                    {friendRequests.length}
+                  </span>
+                )}
+            </button>
                 </>
               )}
-            </div>
+          </div>
           </div>
         </>
       )}
@@ -1902,15 +1902,15 @@ function Dashboard() {
 
               {/* Search Projects */}
               <div className="relative mb-6">
-                <input
-                  type="text"
+                  <input
+                    type="text"
                   placeholder="Search projects..."
                   value={projectSearchTerm}
                   onChange={(e) => setProjectSearchTerm(e.target.value)}
                   className="w-full py-2 pl-10 pr-4 bg-[#1E1E29]/60 border border-[#2A2A3A] rounded-md text-white placeholder-[#8F8FA3] focus:outline-none focus:border-[#4D5DFE]"
                 />
                 <Search className="absolute left-3 top-2.5 text-[#8F8FA3]" size={18} />
-              </div>
+          </div>
 
               {loading ? (
                 <div className="flex justify-center items-center h-40">
@@ -1975,8 +1975,8 @@ function Dashboard() {
                   <Plus size={16} className="mr-2" />
                   <span className="font-bold">New Task</span>
                 </button>
-              </div>
-
+                </div>
+                
               {/* New Task Form */}
               {showNewTaskForm && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1992,7 +1992,7 @@ function Dashboard() {
                     </div>
                     
                     <div className="space-y-4">
-                      <div>
+              <div>
                         <label className="block text-sm font-medium mb-1">Title</label>
                         <input
                           type="text"
@@ -2442,29 +2442,29 @@ function Dashboard() {
                     </div>
                   </div>
                   
-                  {loading ? (
-                    <div className="flex justify-center items-center h-32">
-                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
-                    </div>
-                  ) : friends.length === 0 ? (
+                {loading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                  </div>
+                ) : friends.length === 0 ? (
                     <div className="text-center p-6 bg-[#14141B]/60 rounded-lg border border-[#2A2A3A]">
                       <Users className="mx-auto mb-4 text-[#8F8FA3]" size={32} />
                       <h3 className="text-lg font-semibold mb-2">No friends yet</h3>
                       <p className="text-[#8F8FA3] mb-6">Connect with other users to chat and collaborate</p>
-                      <button 
+                    <button 
                         onClick={() => handleNavigation('findFriends')} 
                         className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-4 py-2 rounded-md text-sm transition-colors inline-flex items-center"
-                      >
+                    >
                         <UserPlus size={16} className="mr-2" />
                         Find Friends
-                      </button>
-                    </div>
-                  ) : (
+                    </button>
+                  </div>
+                ) : (
                     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                      {friends
-                        .filter(friend => 
+                    {friends
+                      .filter(friend => 
                           (friend.userName?.toLowerCase() || friend.name?.toLowerCase() || '').includes(friendSearchTerm.toLowerCase())
-                        )
+                      )
                         .map(friend => (
                           <div 
                             key={friend._id || friend.id} 
@@ -2472,30 +2472,30 @@ function Dashboard() {
                             onClick={() => handleSelectFriend(friend)}
                           >
                             <div className="flex items-center">
-                              <div className="relative">
-                                <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                                <img 
-                                  src={friend.profilePic || friend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`)}
-                                  alt={friend.userName || friend.name || 'User'} 
+                            <div className="relative">
+                              <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                              <img 
+                                src={friend.profilePic || friend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`)}
+                                alt={friend.userName || friend.name || 'User'} 
                                   className="w-12 h-12 rounded-full object-cover relative z-10"
-                                />
-                              </div>
+                              />
+                            </div>
                               <div className="ml-3 truncate">
                                 <h4 className="font-medium truncate">{friend.userName || friend.name || 'Unknown User'}</h4>
                                 <p className="text-xs text-[#8F8FA3] truncate">
-                                  {friend.status || 'Online'}
-                                </p>
-                              </div>
+                                {friend.status || 'Online'}
+                              </p>
                             </div>
                           </div>
+                          </div>
                         ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              
+                  </div>
+                )}
+              </div>
+            )}
+
               {mainContent === 'findFriends' && (
-                <div>
+              <div>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-semibold">Find Friends</h2>
                     <div className="relative">
@@ -2510,106 +2510,106 @@ function Dashboard() {
                     </div>
                   </div>
                   
-                  {loading ? (
-                    <div className="flex justify-center items-center h-32">
-                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
-                    </div>
-                  ) : filteredUsers.length === 0 ? (
+                {loading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                  </div>
+                ) : filteredUsers.length === 0 ? (
                     <div className="text-center p-6 bg-[#14141B]/60 rounded-lg border border-[#2A2A3A]">
                       <Users className="mx-auto mb-4 text-[#8F8FA3]" size={32} />
                       <h3 className="text-lg font-semibold mb-2">No users found</h3>
                       <p className="text-[#8F8FA3]">Try searching for different users</p>
-                    </div>
-                  ) : (
+                  </div>
+                ) : (
                     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                      {filteredUsers.map(user => (
+                    {filteredUsers.map(user => (
                         <div key={user._id || user.id} className="bg-[#1E1E29]/40 rounded-lg p-4 border border-[#2A2A3A]">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <div className="relative">
-                                <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                                <img 
-                                  src={user.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${user.userName || 'User'}&background=4D5DFE&color=fff`)} 
-                                  alt={user.userName || 'User'} 
-                                  className="w-10 h-10 rounded-full object-cover relative z-10"
-                                />
-                              </div>
+                        <div className="flex items-center">
+                          <div className="relative">
+                            <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                            <img 
+                              src={user.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${user.userName || 'User'}&background=4D5DFE&color=fff`)} 
+                              alt={user.userName || 'User'} 
+                              className="w-10 h-10 rounded-full object-cover relative z-10"
+                            />
+                          </div>
                               <div className="ml-2 truncate">
                                 <h4 className="font-medium text-sm truncate">{user.userName || 'Unknown User'}</h4>
-                              </div>
-                            </div>
+                          </div>
+                        </div>
                             <button 
                               className="p-1.5 bg-[#4D5DFE]/20 hover:bg-[#4D5DFE]/30 text-[#4D5DFE] rounded-md text-sm transition-colors" 
                               onClick={() => handleSendFriendRequest(user.id)}
                             >
                               <UserPlus size={14} />
-                            </button>
+                        </button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
               {mainContent === 'requests' && (
-                <div>
+              <div>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-semibold">Friend Requests</h2>
                   </div>
                   
-                  {loading ? (
-                    <div className="flex justify-center items-center h-32">
-                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
-                    </div>
-                  ) : friendRequests.length === 0 ? (
+                {loading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                  </div>
+                ) : friendRequests.length === 0 ? (
                     <div className="text-center p-6 bg-[#14141B]/60 rounded-lg border border-[#2A2A3A]">
                       <Bell className="mx-auto mb-4 text-[#8F8FA3]" size={32} />
                       <h3 className="text-lg font-semibold mb-2">No friend requests</h3>
                       <p className="text-[#8F8FA3]">You don't have any pending friend requests</p>
-                    </div>
-                  ) : (
+                  </div>
+                ) : (
                     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                      {friendRequests.map((request, index) => (
+                    {friendRequests.map((request, index) => (
                         <div key={request.id || request._id || index} className="bg-[#1E1E29]/40 rounded-lg p-4 border border-[#2A2A3A]">
                           <div className="flex items-center mb-3">
-                            <div className="relative">
-                              <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                              <img 
-                                src={request.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${request.userName || request.name || 'User'}&background=4D5DFE&color=fff`)} 
-                                alt={request.userName || request.name || 'User'} 
+                          <div className="relative">
+                            <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                            <img 
+                              src={request.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${request.userName || request.name || 'User'}&background=4D5DFE&color=fff`)} 
+                              alt={request.userName || request.name || 'User'} 
                                 className="w-12 h-12 rounded-full object-cover relative z-10"
-                              />
-                            </div>
+                            />
+                          </div>
                             <div className="ml-3 truncate">
                               <h4 className="font-medium truncate">{request.userName || request.name || 'Unknown User'}</h4>
-                              <p className="text-xs text-[#8F8FA3]">
+                            <p className="text-xs text-[#8F8FA3]">
                                 Sent you a request
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleAcceptFriendRequest(request.id)}
-                              className="flex-1 p-1.5 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md text-xs flex items-center justify-center transition-colors"
-                            >
-                              <Check size={12} className="mr-1" />
-                              Accept
-                            </button>
-                            <button
-                              onClick={() => handleRejectFriendRequest(request.id)}
-                              className="flex-1 p-1.5 bg-[#E94560]/10 hover:bg-[#E94560]/20 text-[#E94560] rounded-md text-xs flex items-center justify-center transition-colors"
-                            >
-                              <X size={12} className="mr-1" />
-                              Decline
-                            </button>
+                            </p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleAcceptFriendRequest(request.id)}
+                              className="flex-1 p-1.5 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md text-xs flex items-center justify-center transition-colors"
+                          >
+                              <Check size={12} className="mr-1" />
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => handleRejectFriendRequest(request.id)}
+                              className="flex-1 p-1.5 bg-[#E94560]/10 hover:bg-[#E94560]/20 text-[#E94560] rounded-md text-xs flex items-center justify-center transition-colors"
+                          >
+                              <X size={12} className="mr-1" />
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
               {/* Chat UI for mobile view */}
               {mainContent === 'chat' && selectedFriend && (
@@ -2640,8 +2640,8 @@ function Dashboard() {
                         {selectedFriend.status || 'Online'}
                       </p>
                     </div>
-                  </div>
-
+        </div>
+          
                   {/* Messages area */}
                   <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B] border-l border-r border-[#2A2A3A]">
                     {loading ? (
@@ -2690,22 +2690,22 @@ function Dashboard() {
                   {/* Message input */}
                   <div className="p-3 border border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm rounded-b-lg">
                     <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-                      <input
-                        type="text"
+              <input
+                type="text"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Type a message..."
                         className="flex-1 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4D5DFE] backdrop-blur-sm"
-                      />
-                      <button
+              />
+              <button
                         type="submit"
                         disabled={!newMessage.trim() || socketStatus === 'disconnected'}
                         className="p-2 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
+              >
                         <Send size={16} />
-                      </button>
+              </button>
                     </form>
-                  </div>
+            </div>
                 </div>
               )}
             </div>
@@ -2717,22 +2717,22 @@ function Dashboard() {
               <h2 className="text-xl font-semibold mb-2">Welcome to Your Dashboard</h2>
               <p className="text-[#8F8FA3] max-w-md mb-6">Click the menu icon in the top left to access your projects and tasks</p>
               <div className="flex space-x-3">
-                <button 
+              <button
                   onClick={() => handleNavigation('projects')} 
                   className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-4 py-2 rounded-md flex items-center transition-colors"
-                >
+              >
                   <Folder size={16} className="mr-2" />
                   View Projects
-                </button>
-                <button 
+              </button>
+              <button
                   onClick={() => handleNavigation('tasks')} 
                   className="bg-[#1E1E29] border border-[#2A2A3A] hover:bg-[#2A2A3A] px-4 py-2 rounded-md flex items-center transition-colors"
-                >
+              >
                   <List size={16} className="mr-2" />
                   View Tasks
-                </button>
-              </div>
+              </button>
             </div>
+          </div>
           )}
         </div>
         
@@ -2741,10 +2741,10 @@ function Dashboard() {
           <div className="w-72 border-l border-[#2A2A3A] bg-[#14141B]/80 backdrop-blur-sm flex flex-col fixed top-16 right-0 bottom-0 transition-all duration-300 ease-in-out z-40">
             {rightSidebarContent === 'chat' && selectedFriend ? (
               // Chat sidebar
-              <>
-                {/* Chat header */}
+          <>
+            {/* Chat header */}
                 <div className="p-4 border-b border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm flex items-center">
-                  <button 
+                <button 
                     className="mr-3 text-[#8F8FA3] hover:text-white"
                     onClick={() => {
                       setRightSidebarContent('friends');
@@ -2752,88 +2752,88 @@ function Dashboard() {
                     }}
                   >
                     <ChevronLeft size={18} />
-                  </button>
-                  <div className="relative">
-                    <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                    <img 
-                      src={selectedFriend.profilePic || selectedFriend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`)} 
-                      alt={selectedFriend.userName || selectedFriend.name || 'User'} 
+                </button>
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                  <img 
+                    src={selectedFriend.profilePic || selectedFriend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`)} 
+                    alt={selectedFriend.userName || selectedFriend.name || 'User'} 
                       className="w-9 h-9 rounded-full object-cover relative z-10"
-                    />
-                  </div>
+                  />
+                </div>
                   <div className="ml-3 flex-1 truncate">
                     <h3 className="font-semibold truncate">{selectedFriend.userName || selectedFriend.name || 'Unknown User'}</h3>
-                    <p className="text-xs text-[#8F8FA3]">
-                      {selectedFriend.status || 'Online'}
-                    </p>
-                  </div>
+                  <p className="text-xs text-[#8F8FA3]">
+                    {selectedFriend.status || 'Online'}
+                  </p>
                 </div>
-                
-                {/* Messages area */}
+      </div>
+
+              {/* Messages area */}
                 <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B]">
-                  {loading ? (
+                {loading ? (
                     <div className="flex justify-center items-center h-32">
                       <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
-                    </div>
-                  ) : messages.length === 0 ? (
+              </div>
+                ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-32 text-[#8F8FA3]">
                       <MessageSquare size={32} className="mb-2 opacity-20" />
                       <p className="text-sm">No messages yet</p>
-                    </div>
-                  ) : (
+                </div>
+                ) : (
                     <div className="space-y-3">
-                      {messages.map((message, index) => {
-                        const isMyMessage = message.senderId === userId;
-                        return (
-                          <div 
-                            key={message.id || index}
-                            className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <div
-                              className={`max-w-[90%] rounded-2xl p-2 ${
-                                isMyMessage 
-                                  ? 'bg-[#4D5DFE]/90 text-white rounded-tr-none' 
-                                  : 'bg-[#1E1E29]/80 backdrop-blur-sm text-white rounded-tl-none'
-                              } ${message.pending ? 'opacity-70' : ''}`}
-                            >
-                              <p className="text-sm">{message.text}</p>
-                              <p className="text-xs text-right opacity-70">
-                                {typeof message.timestamp === 'object' 
-                                  ? message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-                                  : new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                                }
-                                {message.pending && ' • Sending...'}
-                                {message.error && ' • Failed to send'}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Message input */}
-                <div className="p-3 border-t border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm">
-                  <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Type a message..."
-                      className="flex-1 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4D5DFE] backdrop-blur-sm"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!newMessage.trim() || socketStatus === 'disconnected'}
-                      className="p-2 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    {messages.map((message, index) => {
+                      const isMyMessage = message.senderId === userId;
+                  return (
+                        <div 
+                      key={message.id || index}
+                          className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
                     >
-                      <Send size={16} />
-                    </button>
-                  </form>
-                </div>
-              </>
+                      <div
+                              className={`max-w-[90%] rounded-2xl p-2 ${
+                              isMyMessage 
+                                ? 'bg-[#4D5DFE]/90 text-white rounded-tr-none' 
+                                : 'bg-[#1E1E29]/80 backdrop-blur-sm text-white rounded-tl-none'
+                            } ${message.pending ? 'opacity-70' : ''}`}
+                          >
+                              <p className="text-sm">{message.text}</p>
+                            <p className="text-xs text-right opacity-70">
+                              {typeof message.timestamp === 'object' 
+                                ? message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+                                : new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                              }
+                              {message.pending && ' • Sending...'}
+                              {message.error && ' • Failed to send'}
+                        </p>
+                      </div>
+                        </div>
+                  );
+                    })}
+              <div ref={messagesEndRef} />
+                  </div>
+                )}
+            </div>
+
+            {/* Message input */}
+                <div className="p-3 border-t border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm">
+              <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4D5DFE] backdrop-blur-sm"
+                />
+                  <button
+                  type="submit"
+                    disabled={!newMessage.trim() || socketStatus === 'disconnected'}
+                      className="p-2 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <Send size={16} />
+                  </button>
+              </form>
+            </div>
+          </>
             ) : rightSidebarContent === 'friends' ? (
               // Friends sidebar
               <>
@@ -2917,17 +2917,17 @@ function Dashboard() {
                                 alt={friend.userName || friend.name || 'User'} 
                                 className="w-9 h-9 rounded-full object-cover relative z-10"
                               />
-                            </div>
+          </div>
                             <div className="ml-2 truncate">
                               <h4 className="font-medium text-sm truncate">{friend.userName || friend.name || 'Unknown User'}</h4>
                               <p className="text-xs text-[#8F8FA3] truncate">
                                 {friend.status || 'Online'}
                               </p>
-                            </div>
-                          </div>
+                </div>
+        </div>
                         ))
                       }
-                    </div>
+      </div>
                   )}
                 </div>
               </>
@@ -3001,9 +3001,9 @@ function Dashboard() {
                           </div>
                         ))
                       }
-                    </div>
-                  )}
-                </div>
+          </div>
+        )}
+        </div>
               </>
             ) : rightSidebarContent === 'requests' ? (
               // Friend requests sidebar

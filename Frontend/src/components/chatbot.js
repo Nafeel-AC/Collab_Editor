@@ -1018,14 +1018,14 @@ export default function ChatbotPage() {
 
           <div className="flex items-center space-x-1">
             {!isMobile && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={toggleSidebar}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleSidebar}
                 className="p-2 rounded-full hover:bg-[#2A2A3A]/50 text-[#8F8FA3]"
-              >
-                {isSidebarOpen ? <PanelLeft size={18} /> : <PanelRight size={18} />}
-              </motion.button>
+          >
+            {isSidebarOpen ? <PanelLeft size={18} /> : <PanelRight size={18} />}
+          </motion.button>
             )}
             
             {/* Mobile actions button */}
@@ -1145,20 +1145,20 @@ export default function ChatbotPage() {
             {/* Rename chat interface */}
             {isNamingChat ? (
               <div className="mb-3 flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={newChatName}
-                  onChange={(e) => setNewChatName(e.target.value)}
+                  <input
+                    type="text"
+                    value={newChatName}
+                    onChange={(e) => setNewChatName(e.target.value)}
                   onKeyDown={handleNameKeyPress}
                   placeholder="Enter chat name..."
                   className="flex-1 rounded-lg py-2 px-3 bg-[#1E1E29]/80 border border-[#2A2A3A] focus:border-[#4D5DFE]/50 focus:outline-none focus:ring-0 input-glow text-white placeholder-[#8F8FA3]"
-                  autoFocus
-                />
+                    autoFocus
+                  />
                 <button 
-                  onClick={saveChatName}
+                    onClick={saveChatName}
                   className="py-2 px-3 rounded-lg bg-[#4D5DFE] text-white text-sm font-medium"
-                >
-                  Save
+                  >
+                    Save
                 </button>
                 <button 
                   onClick={() => setIsNamingChat(false)}
@@ -1166,31 +1166,31 @@ export default function ChatbotPage() {
                 >
                   <X size={16} />
                 </button>
-              </div>
+                </div>
             ) : (
               <div className="relative flex items-end md:items-center rounded-2xl overflow-hidden bg-[#1E1E29]/80 border border-[#2A2A3A] shadow-md focus-within:border-[#4D5DFE]/40 focus-within:input-glow transition-shadow">
-                <textarea
-                  ref={textareaRef}
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
+              <textarea
+                ref={textareaRef}
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
                   onKeyDown={handleKeyPress}
                   placeholder="Ask me anything..."
                   className="flex-1 py-3 pl-4 pr-12 bg-transparent border-none focus:outline-none focus:ring-0 text-white placeholder-[#8F8FA3] resize-none max-h-32 leading-normal text-sm md:text-base"
                   rows={1}
                 ></textarea>
-                <motion.button
+              <motion.button
                   whileTap={{ scale: 0.8 }}
                   disabled={isLoading || userInput.trim() === ""}
-                  onClick={handleSendMessage}
+                onClick={handleSendMessage}
                   className={`absolute right-2 bottom-2 md:right-3 md:bottom-3 p-2 rounded-full ${
                     isLoading || userInput.trim() === "" 
                       ? "bg-[#2A2A3A] text-[#8F8FA3]" 
-                      : "send-button text-white"
+                    : "send-button text-white"
                   } transition-all duration-300`}
-                >
+              >
                   <Send size={isMobile ? 16 : 18} />
-                </motion.button>
-              </div>
+              </motion.button>
+            </div>
             )}
           </div>
         </div>

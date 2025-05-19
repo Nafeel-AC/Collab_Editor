@@ -40,25 +40,7 @@ const EditorPage = () => {
   // State for mobile responsive tabbed interface
   const [activeTab, setActiveTab] = useState('editor'); // 'editor', 'files', 'terminal', 'snippets'
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // Function to check if we're on mobile
-  const isMobile = () => window.innerWidth < 768;
-
-  // Add resize listener to update view on window resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (!isMobile()) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    handleResize(); // Initial check
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
+  const [showMobileTerminal, setShowMobileTerminal] = useState(false);
   
   // Add state for project save modal
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -69,6 +51,9 @@ const EditorPage = () => {
   const socketRef = useRef(null);
   const codeChangeRef = useRef(false);
   const debounceTimeoutRef = useRef(null);
+  
+  // Add state for tracking image load errors
+  const [imageLoadErrors, setImageLoadErrors] = useState({});
   
   // Store username in localStorage for persistence
   useEffect(() => {
@@ -287,8 +272,21 @@ const EditorPage = () => {
       
       console.log('Fetching profiles for users:', usersToFetch);
       
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No authentication token found');
+        return;
+      }
+      
+      // Log the API URL for debugging
+      console.log(`Making request to: ${API_BASE_URL}/api/users/profiles-by-username`);
+      
       const response = await axios.post(`${API_BASE_URL}/api/users/profiles-by-username`, {
         usernames: usersToFetch
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
       
       if (response.data && response.data.profiles) {
@@ -296,122 +294,165 @@ const EditorPage = () => {
         
         // Update the current users with their profile data
         const updatedUsers = currentUsers.map(user => {
-          const profile = response.data.profiles.find(p => p.username === user.username);
+          // Find the matching profile, accounting for case differences
+          const profile = response.data.profiles.find(p => 
+            p.userName?.toLowerCase() === user.username?.toLowerCase()
+          );
           
           if (profile) {
+            console.log(`Found profile for ${user.username}:`, profile);
             return {
               ...user,
-              profilePicture: profile.profilePicture
+              profilePicture: profile.profilePic // Note: Backend uses profilePic, not profilePicture
             };
           }
           
           return user;
         });
         
+        console.log('Updated users with profiles:', updatedUsers);
         setCurrentUsers(updatedUsers);
       }
     } catch (error) {
-      console.error('Error fetching user profiles:', error);
+      console.error('Error fetching user profiles:', error.response || error);
       // Don't update the state if there's an error, just continue with what we have
     }
   };
   
   // Helper function to get profile image URL
   const getProfileImageUrl = (user) => {
-    // Check if user has a profile picture from the API
-    if (user.profilePicture) {
-      return getImageUrl(user.profilePicture);
+    // Check if we've already had an error with this user's image
+    if (imageLoadErrors[user.username]) {
+      // Return default avatar if there was a previous error
+      const firstLetter = (user.username || 'A')[0].toUpperCase();
+      return `https://ui-avatars.com/api/?name=${firstLetter}&background=random&color=fff&bold=true`;
+    }
+    
+    try {
+      // Log the user object to debug
+      console.log(`Getting image URL for user:`, user);
+      
+      // Check if user has a profile picture from the API
+      if (user.profilePicture) {
+        // If the profile picture is a full URL, use it directly
+        if (user.profilePicture.startsWith('http')) {
+          console.log(`Using direct URL: ${user.profilePicture}`);
+          return user.profilePicture;
+        }
+        // Otherwise get the full URL from our API utility
+        console.log(`Using API utility for: ${user.profilePicture}`);
+        return getImageUrl(user.profilePicture);
+      }
+    } catch (error) {
+      console.warn('Error getting profile image:', error);
+      // Continue to fallback
     }
     
     // Fallback to default image based on username (first letter)
     const firstLetter = (user.username || 'A')[0].toUpperCase();
+    console.log(`Using fallback avatar for ${user.username}`);
     return `https://ui-avatars.com/api/?name=${firstLetter}&background=random&color=fff&bold=true`;
+  };
+  
+  // Handle image load error
+  const handleImageError = (username) => {
+    setImageLoadErrors(prev => ({
+      ...prev,
+      [username]: true
+    }));
+  };
+  
+  // Function to render the mobile editor content
+  const renderMobileEditorContent = () => {
+    return (
+      <div className="h-full relative">
+        <CodeMirror
+          value={code}
+          height={showMobileTerminal ? "50%" : "100%"}
+          theme={githubDark}
+          extensions={[getLanguageExtension()]}
+          onChange={handleCodeChange}
+          basicSetup={{
+            lineNumbers: true,
+            highlightActiveLineGutter: true,
+            highlightSpecialChars: true,
+            history: true,
+            foldGutter: true,
+            drawSelection: true,
+            dropCursor: true,
+            allowMultipleSelections: true,
+            indentOnInput: true,
+            syntaxHighlighting: true,
+            bracketMatching: true,
+            closeBrackets: true,
+            autocompletion: true,
+            rectangularSelection: true,
+            crosshairCursor: true,
+            highlightActiveLine: true,
+            highlightSelectionMatches: true,
+            closeBracketsKeymap: true,
+            defaultKeymap: true,
+            searchKeymap: true,
+            historyKeymap: true,
+            foldKeymap: true,
+            completionKeymap: true,
+            lintKeymap: true,
+          }}
+        />
+        
+        {/* Sticky Run Button */}
+        <button 
+          onClick={() => {
+            setShowMobileTerminal(true);
+            setRunCode(true);
+          }}
+          className="absolute bottom-4 right-4 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white p-3 rounded-full shadow-lg z-10"
+        >
+          <Play size={20} />
+        </button>
+        
+        {/* Mobile Terminal */}
+        {showMobileTerminal && (
+          <div className="h-[50%] border-t border-[#2A2A3A]">
+            <div className="flex justify-between items-center bg-[#1E1E29] px-3 py-2">
+              <h3 className="text-sm font-semibold">Terminal</h3>
+              <button 
+                onClick={() => setShowMobileTerminal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <CodeTerminal 
+              code={code} 
+              language={language} 
+              autoRun={runCode} 
+              onRunComplete={() => setRunCode(false)} 
+            />
+          </div>
+        )}
+      </div>
+    );
   };
   
   // Function to render the current tab content on mobile
   const renderMobileTabContent = () => {
     switch (activeTab) {
       case 'editor':
-        return (
-          <div className="h-full">
-            <CodeMirror
-              value={code}
-              height="100%"
-              theme={githubDark}
-              extensions={[getLanguageExtension()]}
-              onChange={handleCodeChange}
-              basicSetup={{
-                lineNumbers: true,
-                highlightActiveLineGutter: true,
-                highlightSpecialChars: true,
-                history: true,
-                foldGutter: true,
-                drawSelection: true,
-                dropCursor: true,
-                allowMultipleSelections: true,
-                indentOnInput: true,
-                syntaxHighlighting: true,
-                bracketMatching: true,
-                closeBrackets: true,
-                autocompletion: true,
-                rectangularSelection: true,
-                crosshairCursor: true,
-                highlightActiveLine: true,
-                highlightSelectionMatches: true,
-                closeBracketsKeymap: true,
-                defaultKeymap: true,
-                searchKeymap: true,
-                historyKeymap: true,
-                foldKeymap: true,
-                completionKeymap: true,
-                lintKeymap: true,
-              }}
-            />
-          </div>
-        );
-      case 'files':
+        return renderMobileEditorContent();
+      case 'explorer':
         return (
           <FileExplorer 
             roomId={roomId}
-            onFileSelect={handleFileSelect}
+            onFileSelect={(file) => {
+              handleFileSelect(file);
+              setActiveTab('editor'); // Switch back to editor after selecting a file
+            }}
             selectedFile={selectedFile}
           />
         );
-      case 'terminal':
-        return (
-          <CodeTerminal code={code} language={language} />
-        );
-      case 'snippets':
-        return (
-          <CodeSnippetLibrary onSnippetSelect={(snippet) => {
-            const newCode = code + '\n\n' + snippet.code;
-            setCode(newCode);
-            
-            // Broadcast the code update to other users
-            if (socketRef.current && socketRef.current.connected && roomId) {
-              const updateData = {
-                roomId,
-                code: newCode,
-                content: newCode,
-                sender: socketRef.current.id,
-                fileId: selectedFile?._id,
-                timestamp: Date.now()
-              };
-              
-              socketRef.current.emit('code-update', updateData);
-              socketRef.current.emit('code-change', updateData);
-              
-              console.log('Sent code update with snippet');
-              
-              // Update file content in the backend
-              if (selectedFile) {
-                updateFileContent(selectedFile._id, newCode);
-              }
-            }
-          }} />
-        );
       default:
-        return null;
+        return renderMobileEditorContent();
     }
   };
   
@@ -536,8 +577,8 @@ const EditorPage = () => {
       const shouldSave = window.confirm('Would you like to save this project before closing?');
       
       if (shouldSave) {
-        setShowSaveModal(true);
-      } else {
+            setShowSaveModal(true);
+          } else {
         // Directly close the room without saving
         await finishRoomClose();
       }
@@ -597,7 +638,7 @@ const EditorPage = () => {
     try {
       // Clean up on server
       await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
-        headers: {
+          headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
       });
@@ -631,6 +672,25 @@ const EditorPage = () => {
     return message;
   };
   
+  // Function to check if we're on mobile
+  const isMobile = () => window.innerWidth < 768;
+
+  // Add resize listener to update view on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (!isMobile()) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial check
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
   return (
     <div className="flex flex-col h-screen bg-[#14141B] text-white">
       {/* Header */}
@@ -643,15 +703,15 @@ const EditorPage = () => {
           >
             <Menu size={24} />
           </button>
-        </div>
-        
+              </div>
+              
         {/* Room Details and Actions */}
         <div className="flex-1 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500' }`}></div>
             
             {!isConnected && (
-              <button 
+              <button
                 onClick={reconnect}
                 className="text-[#4D5DFE] hover:text-[#3A4AE1]"
                 title="Reconnect"
@@ -666,20 +726,20 @@ const EditorPage = () => {
             
             {/* Desktop buttons */}
             <div className="hidden md:flex items-center space-x-2">
-              <button
-                onClick={copyRoomId}
-                className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
-              >
-                <Share2 className="h-4 w-4 mr-1" />
-                Share
-              </button>
-              <button
-                onClick={closeRoom}
-                className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Close
-              </button>
+            <button
+              onClick={copyRoomId}
+              className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+            >
+              <Share2 className="h-4 w-4 mr-1" />
+              Share
+            </button>
+            <button
+              onClick={closeRoom}
+              className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Close
+            </button>
             </div>
           </div>
           
@@ -688,14 +748,12 @@ const EditorPage = () => {
             {currentUsers.length > 0 && (
               <AnimatedTooltip 
                 size={45}
-                items={currentUsers.map(user => {
-                  return {
-                    id: user.socketId || user.id || Math.random().toString(),
-                    name: user.username || 'Anonymous',
-                    designation: user.username === username ? '(you)' : '',
-                    image: getProfileImageUrl(user)
-                  };
-                })}
+                items={currentUsers.map(user => ({
+                  id: user.socketId || user.id || Math.random().toString(),
+                  name: user.username || 'Anonymous',
+                  designation: user.username === username ? '(you)' : '',
+                  image: getProfileImageUrl(user)
+                }))}
               />
             )}
           </div>
@@ -806,35 +864,21 @@ const EditorPage = () => {
         
         {renderMobileTabContent()}
         
-        {/* Mobile Tabs Navigation */}
+        {/* Mobile Tabs Navigation - Simplified to just Editor and Explorer */}
         <div className="flex border-t border-[#2A2A3A] bg-[#14141B]">
-          <button 
+          <button
             className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'editor' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
             onClick={() => setActiveTab('editor')}
           >
-            <Code size={20} />
+            <Code size={22} />
             <span className="text-xs mt-1">Editor</span>
           </button>
-          <button 
-            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'files' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
-            onClick={() => setActiveTab('files')}
+          <button
+            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'explorer' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
+            onClick={() => setActiveTab('explorer')}
           >
-            <FileText size={20} />
-            <span className="text-xs mt-1">Files</span>
-          </button>
-          <button 
-            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'terminal' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
-            onClick={() => setActiveTab('terminal')}
-          >
-            <Terminal size={20} />
-            <span className="text-xs mt-1">Terminal</span>
-          </button>
-          <button 
-            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'snippets' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
-            onClick={() => setActiveTab('snippets')}
-          >
-            <Code size={20} />
-            <span className="text-xs mt-1">Snippets</span>
+            <FileText size={22} />
+            <span className="text-xs mt-1">Explorer</span>
           </button>
         </div>
       </div>
@@ -865,7 +909,7 @@ const EditorPage = () => {
                 ></textarea>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
-                <button
+          <button
                   onClick={cancelSaveProject}
                   className="px-4 py-2 bg-[#2A2A3A] text-white rounded-md hover:bg-[#3A3A4A]"
                   disabled={isSaving}
@@ -888,9 +932,9 @@ const EditorPage = () => {
                   ) : (
                     'Save Project'
                   )}
-                </button>
-              </div>
-            </div>
+          </button>
+        </div>
+      </div>
           </div>
         </div>
       )}
