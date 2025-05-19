@@ -493,7 +493,7 @@ const EditorPage = () => {
       
       console.log('File content updated in backend');
     } catch (error) {
-      console.error('Error updating file content:', error);
+      console.error('Error updating  content:', error);
     }
   };
   
@@ -592,7 +592,7 @@ const EditorPage = () => {
     setShowSaveModal(false);
   };
   
-  // Function to finish room closure process
+  // Function to finish room closure proce
   const finishRoomClose = async () => {
     try {
       // Clean up on server
