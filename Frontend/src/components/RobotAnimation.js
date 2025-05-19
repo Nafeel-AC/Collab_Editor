@@ -48,27 +48,27 @@ const RobotAnimation = () => {
               </h1>
             ) : (
               /* Typewriter effect for desktop */
-              <TypewriterEffect
-                words={[
-                  {
-                    text: "Welcome",
-                    className: "text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500"
-                  },
-                  {
-                    text: " to the ",
-                    className: "text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500"
-                  },
-                  {
-                    text: "AI",
-                    className: "text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500"
-                  },
-                  {
-                    text: " Assistant",
-                    className: "text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-blue-400"
-                  }
-                ]}
-                className="text-left mb-4"
-              />
+            <TypewriterEffect
+              words={[
+                {
+                  text: "Welcome",
+                  className: "text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500"
+                },
+                {
+                  text: " to the ",
+                  className: "text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500"
+                },
+                {
+                  text: "AI",
+                  className: "text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500"
+                },
+                {
+                  text: " Assistant",
+                  className: "text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-blue-400"
+                }
+              ]}
+              className="text-left mb-4"
+            />
             )}
             
             <p className="text-gray-300 text-xl md:text-xl mb-8 z-20 relative">
@@ -91,18 +91,18 @@ const RobotAnimation = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Animation below content on mobile */}
         {isMobile && (
           <div className="w-full h-[300px] flex items-center justify-center bg-black relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-t from-black/0 to-black pointer-events-none z-5"></div>
-            <DotLottieReact
-              src="https://lottie.host/2d7d728a-7f45-432a-b2d8-582934cdfd6c/xYJD9c2kZ9.lottie"
-              loop
-              autoplay
+          <DotLottieReact
+            src="https://lottie.host/2d7d728a-7f45-432a-b2d8-582934cdfd6c/xYJD9c2kZ9.lottie"
+            loop
+            autoplay
               className="w-[130%] h-[130%] object-contain"
-            />
-          </div>
+          />
+        </div>
         )}
       </div>
     </div>
