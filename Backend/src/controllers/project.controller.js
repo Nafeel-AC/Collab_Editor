@@ -7,7 +7,7 @@ import mongoose from "mongoose";
 export const saveProject = async (req, res) => {
   try {
     const { roomId } = req.params;
-    const { name, description, tags, createdBy } = req.body;
+    const { name, description, tags, createdBy, projectId } = req.body;
     const userId = req.userId; // From authentication middleware
     
     if (!roomId) {
@@ -52,8 +52,34 @@ export const saveProject = async (req, res) => {
     let project;
     let isNewProject = true;
     
+    // If explicit projectId is provided, try to update that project directly
+    if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
+      // Try to find the specified project
+      const existingProject = await Project.findById(projectId);
+      
+      if (existingProject && existingProject.hostId.toString() === userId) {
+        console.log(`Updating existing project by ID: ${existingProject._id} (${existingProject.name})`);
+        isNewProject = false;
+        
+        // Update the existing project
+        existingProject.name = name;
+        existingProject.description = description || existingProject.description;
+        existingProject.files = files.map(file => file._id);
+        existingProject.language = room.language;
+        if (tags) existingProject.tags = tags;
+        existingProject.lastAccessed = new Date();
+        existingProject.updatedAt = new Date();
+        
+        // Save the updated project
+        project = await existingProject.save();
+        console.log(`Project updated successfully: ${project._id}`);
+      } else {
+        console.log(`Project with ID ${projectId} not found or user doesn't have access.`);
+        return res.status(403).json({ message: "Project not found or you don't have permission to update it" });
+      }
+    } 
     // Check if this room was loaded from an existing project
-    if (room.originalProjectId) {
+    else if (room.originalProjectId) {
       // Try to find the original project
       const existingProject = await Project.findById(room.originalProjectId);
       
@@ -68,6 +94,7 @@ export const saveProject = async (req, res) => {
         existingProject.language = room.language;
         if (tags) existingProject.tags = tags;
         existingProject.lastAccessed = new Date();
+        existingProject.updatedAt = new Date();
         
         // Save the updated project
         project = await existingProject.save();

@@ -782,30 +782,51 @@ const EditorPage = () => {
     
     // Only proceed if confirmed
     if (isConfirmed) {
-      // Show save project modal if applicable
-      const shouldSave = window.confirm('Would you like to save this project before closing?');
-      
-      if (shouldSave) {
-            setShowSaveModal(true);
-          } else {
-        // Notify all users in the room that it's being closed without saving
-        if (socketRef.current && socketRef.current.connected) {
-          socketRef.current.emit('close-room', {
-            roomId,
-            username,
-            savedProject: false
-          });
-        }
-        
-        // Close without saving
-        await closeRoomWithoutSave();
+      // If this is an existing project, save it directly without showing the modal
+      if (isExistingProject && projectId) {
+        await handleSaveProject(true);
+      } else {
+        // Show save project modal for new projects
+        setShowSaveModal(true);
       }
     }
   };
   
   // Function to handle project save
-  const handleSaveProject = async () => {
-    if (!projectName.trim()) {
+  const handleSaveProject = async (isExistingProjectSave = false) => {
+    // For existing projects, if projectName is not set, fetch it first
+    if (isExistingProjectSave && isExistingProject && projectId && !projectName.trim()) {
+      try {
+        // Get authentication token
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No authentication token found');
+          return;
+        }
+        
+        // Fetch project details to get the name
+        const response = await axios.get(`${API_BASE_URL}/api/projects/${projectId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        if (response.data && response.data.project && response.data.project.name) {
+          setProjectName(response.data.project.name);
+          setProjectDescription(response.data.project.description || '');
+        } else {
+          alert('Could not retrieve project information');
+          return;
+        }
+      } catch (error) {
+        console.error('Error fetching project data:', error);
+        alert(`Error retrieving project data: ${error.response?.data?.message || error.message}`);
+        return;
+      }
+    }
+    
+    // If it's a new project, validate the name
+    if (!isExistingProjectSave && !projectName.trim()) {
       alert('Please enter a project name');
       return;
     }
@@ -818,10 +839,12 @@ const EditorPage = () => {
         await updateFileContent(selectedFile._id, code);
       }
       
-      // Create project in backend
+      // Create or update project in backend
       const response = await axios.post(`${API_BASE_URL}/api/projects/save/${roomId}`, {
-        name: projectName,
-        description: projectDescription
+        name: projectName || (isExistingProject ? 'Untitled Project' : ''),
+        description: projectDescription,
+        // Pass projectId for existing projects
+        projectId: isExistingProject ? projectId : undefined
       }, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -854,7 +877,7 @@ const EditorPage = () => {
     }
   };
   
-  // Function to cancel project save
+  // Function to cancel project save (just close the modal)
   const cancelSaveProject = () => {
     setShowSaveModal(false);
   };
@@ -1667,20 +1690,33 @@ const EditorPage = () => {
             
             {/* Desktop buttons */}
             <div className="hidden md:flex items-center space-x-2">
-            <button
-              onClick={copyRoomId}
-              className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
-            >
-              <Share2 className="h-4 w-4 mr-1" />
-              Share
-            </button>
-            <button
-              onClick={closeRoom}
-              className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Close
-            </button>
+              <button
+                onClick={copyRoomId}
+                className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </button>
+              <button
+                onClick={() => {
+                  if (isExistingProject && projectId) {
+                    handleSaveProject(true);
+                  } else {
+                    setShowSaveModal(true);
+                  }
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Save
+              </button>
+              <button
+                onClick={closeRoom}
+                className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Close
+              </button>
               <button
                 onClick={closeRoomWithoutSave}
                 className="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
@@ -1735,7 +1771,11 @@ const EditorPage = () => {
             </button>
                   <button 
               onClick={() => {
-                setShowSaveModal(true);
+                if (isExistingProject && projectId) {
+                  handleSaveProject(true);
+                } else {
+                  setShowSaveModal(true);
+                }
                 setShowMobileHeaderMenu(false);
               }}
               className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors"
@@ -2132,12 +2172,19 @@ const EditorPage = () => {
                 ></textarea>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
-          <button
+                <button
                   onClick={cancelSaveProject}
                   className="px-4 py-2 bg-[#2A2A3A] text-white rounded-md hover:bg-[#3A3A4A]"
                   disabled={isSaving}
                 >
                   Cancel
+                </button>
+                <button
+                  onClick={closeRoomWithoutSave}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  disabled={isSaving}
+                >
+                  Don't Save
                 </button>
                 <button
                   onClick={handleSaveProject}
@@ -2155,9 +2202,9 @@ const EditorPage = () => {
                   ) : (
                     'Save Project'
                   )}
-          </button>
-        </div>
-      </div>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
