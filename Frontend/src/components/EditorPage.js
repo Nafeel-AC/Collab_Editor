@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
-import { API_BASE_URL } from '../config/api.config';
+import { API_BASE_URL, getImageUrl } from '../config/api.config';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -98,7 +98,8 @@ const EditorPage = () => {
       reconnectionDelay: 1000,
       auth: {
         token: token
-      }
+      },
+      timeout: 10000 // Add a longer timeout
     });
     
     // Handle connection events
@@ -114,12 +115,23 @@ const EditorPage = () => {
       });
       
       console.log('Joined room:', roomId, 'as', username);
+      
+      // Request users immediately after joining
+      setTimeout(() => {
+        requestRoomUsers();
+      }, 1000);
     });
     
     // Handle connection error
     socketRef.current.on('connect_error', (error) => {
       console.error('Connection error:', error);
       setIsConnected(false);
+      
+      // Try to connect again after a delay
+      setTimeout(() => {
+        console.log('Attempting to reconnect...');
+        socketRef.current.connect();
+      }, 3000);
     });
     
     // Handle disconnection
@@ -132,6 +144,10 @@ const EditorPage = () => {
     socketRef.current.on('room-users', (users) => {
       console.log('Room users updated:', users);
       if (Array.isArray(users)) {
+        // Debug what profile data we're getting
+        users.forEach(user => {
+          console.log(`User ${user.username} profile data:`, user);
+        });
         setCurrentUsers(users);
       } else {
         console.error('Received non-array users data:', users);
@@ -387,13 +403,26 @@ const EditorPage = () => {
     alert('Attempting to reconnect to server...');
   };
   
-  // Request an updated list of users in the room
+  // Modify the requestRoomUsers function to handle connection issues
   const requestRoomUsers = () => {
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('get-room-users', { roomId });
       console.log('Requested updated room users list');
     } else {
-      alert('Not connected to server. Cannot request users list.');
+      console.warn('Not connected to server. Cannot request users list. Attempting reconnection...');
+      
+      // If socket exists but not connected, try to reconnect
+      if (socketRef.current) {
+        socketRef.current.connect();
+        
+        // After a short delay, try again
+        setTimeout(() => {
+          if (socketRef.current && socketRef.current.connected) {
+            socketRef.current.emit('get-room-users', { roomId });
+            console.log('Retried requesting room users after reconnection');
+          }
+        }, 2000);
+      }
     }
   };
   
@@ -534,6 +563,87 @@ const EditorPage = () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [roomId]);
+  
+  // Add a new useEffect to ensure we manually request room users if we don't get them automatically
+  useEffect(() => {
+    // If we're connected but have no users after 3 seconds, request the users list
+    if (isConnected && currentUsers.length === 0) {
+      const timeoutId = setTimeout(() => {
+        console.log("No users received automatically, manually requesting users list");
+        requestRoomUsers();
+      }, 3000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isConnected, currentUsers.length]);
+  
+  // Add state to store user profiles
+  const [userProfiles, setUserProfiles] = useState({});
+  
+  // Function to fetch user profiles
+  const fetchUserProfiles = async (users) => {
+    if (!users || users.length === 0) return;
+    
+    console.log("Fetching profiles for users:", users);
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      // Create a list of usernames we need to fetch
+      const usernamesToFetch = users
+        .filter(user => user.username && !userProfiles[user.username])
+        .map(user => user.username);
+      
+      if (usernamesToFetch.length === 0) {
+        console.log("No new profiles to fetch");
+        return;
+      }
+      
+      console.log("Fetching profiles for usernames:", usernamesToFetch);
+      
+      // Fetch profile data for all these users in a batch
+      const response = await axios.post(`${API_BASE_URL}/api/users/profiles-by-username`, 
+        { usernames: usernamesToFetch },
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true 
+        }
+      );
+      
+      if (response.data && response.data.profiles) {
+        console.log("Received profiles:", response.data.profiles);
+        
+        // Update our cache with the new profiles
+        const newProfiles = { ...userProfiles };
+        
+        response.data.profiles.forEach(profile => {
+          if (profile.userName) {
+            newProfiles[profile.userName] = profile;
+          }
+        });
+        
+        setUserProfiles(newProfiles);
+      }
+    } catch (error) {
+      console.error("Error fetching user profiles:", error);
+    }
+  };
+  
+  // Update useEffect to fetch profiles when users change
+  useEffect(() => {
+    if (currentUsers.length > 0) {
+      fetchUserProfiles(currentUsers);
+    }
+  }, [currentUsers]);
+  
+  // Modified getProfileImageUrl to work without requiring a backend API call
+  const getProfileImageUrl = (user) => {
+    if (!user) return null;
+    
+    // Generate unique, consistent avatars based on username
+    // This will create a distinct, colorful avatar for each user without needing profile pics
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'User')}&background=random&size=200&bold=true&length=2&format=svg&seed=${user.username}`;
+  };
   
   // Render the active tab content for mobile view
   const renderMobileTabContent = () => {
@@ -772,12 +882,14 @@ const EditorPage = () => {
             {currentUsers.length > 0 && (
               <AnimatedTooltip 
                 size={45}
-                items={currentUsers.map(user => ({
-                  id: user.socketId || user.id || Math.random().toString(),
-                  name: user.username || 'Anonymous',
-                  designation: user.username === username ? '(you)' : '',
-                  image: user.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username || 'User')}&background=random&size=100`
-                }))}
+                items={currentUsers.map(user => {
+                  return {
+                    id: user.socketId || user.id || Math.random().toString(),
+                    name: user.username || 'Anonymous',
+                    designation: user.username === username ? '(you)' : '',
+                    image: getProfileImageUrl(user)
+                  };
+                })}
               />
             )}
           </div>
