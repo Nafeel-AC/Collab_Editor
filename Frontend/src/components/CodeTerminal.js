@@ -400,60 +400,70 @@ ${code}
   if (!isVisible) return null;
 
   return (
-    <div className="terminal-container bg-[#0F0F13] border-t border-[#2A2A3A] backdrop-blur-sm">
-      <div className="flex justify-between items-center px-3 py-2 bg-[#14141B]/90 border-b border-[#2A2A3A]">
-        <div className="flex items-center">
-          <span className="text-sm font-medium mr-3 text-[#D1D1E0]">Terminal</span>
-          <button
+    <div className="h-80 bg-[#1A1A24] border-t border-[#2A2A3A] flex flex-col">
+      <div className="flex items-center justify-between p-2 bg-[#14141B] border-b border-[#2A2A3A]">
+        <div className="font-mono text-sm text-[#8F8FA3] flex items-center">
+          <span className="w-3 h-3 bg-[#4D5DFE] rounded-full mr-2"></span>
+          Terminal
+        </div>
+        <div className="flex items-center space-x-2">
+          <button 
             onClick={executeCode}
             disabled={isExecuting}
-            className="run-button text-xs bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-3 py-1.5 rounded-md flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className={`p-1.5 rounded-md mr-1 transition-colors ${
+              isExecuting ? 'text-gray-500' : 'text-[#4D5DFE] hover:bg-[#4D5DFE]/10'
+            }`}
+            title="Run Code"
           >
-            {isExecuting ? (
-              <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-            ) : (
-              <Play className="h-3 w-3 mr-1.5" />
-            )}
-            Run Code
+            {isExecuting ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
+          </button>
+          <button 
+            onClick={() => setIsVisible(false)} 
+            className="p-1.5 text-[#8F8FA3] hover:text-white rounded-md hover:bg-[#2A2A3A]/50 transition-colors"
+            title="Close Terminal"
+          >
+            <X size={16} />
           </button>
         </div>
-        <button
-          onClick={() => setIsVisible(false)}
-          className="text-[#8F8FA3] hover:text-white rounded-full hover:bg-[#2A2A3A]/50 p-1"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </div>
       
-      {isVisible && (
-        <div className="terminal-scrollbar h-48 overflow-y-auto p-4 font-mono text-sm bg-[#14141B]/50 backdrop-blur-sm">
-          <div className="terminal-output whitespace-pre-wrap text-[#D1D1E0]">
-            {error ? (
-              <div className="text-red-400">{error}</div>
-            ) : (
-              output || 'Terminal ready. Run your code or type a command below.'
-            )}
-          </div>
-          
-          <form onSubmit={handleFormSubmit} className="mt-3 flex items-center bg-[#1E1E29]/70 rounded-md px-3 py-2">
-            <span className="text-[#4D5DFE] mr-2 font-bold">$</span>
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleInputKeyDown}
-              className="terminal-input flex-1 bg-transparent border-none outline-none text-white"
-              placeholder="Type a command..."
-            />
-            <button 
-              type="submit" 
-              className="text-[#4D5DFE] hover:text-[#3A4AE1] transition-colors p-1 hover:bg-[#2A2A3A]/50 rounded-full"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
+      <div 
+        className="flex-1 overflow-y-auto p-4 bg-[#0F0F13] font-mono text-sm text-white terminal-scrollbar"
+        ref={outputRef}
+      >
+        <div className="terminal-output whitespace-pre-wrap">
+          {output || 'Run your code to see the output here...'}
+          {error && <div className="text-red-400">{error}</div>}
+          {waitingForInput && (
+            <div className="flex items-center">
+              <span className="text-green-400 mr-2">{'>'}</span>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                className="bg-transparent border-none outline-none focus:ring-0 text-white terminal-input flex-1"
+                placeholder="Enter your input..."
+                autoFocus
+              />
+            </div>
+          )}
         </div>
+      </div>
+      
+      {waitingForInput && (
+        <form 
+          onSubmit={handleFormSubmit}
+          className="flex border-t border-[#2A2A3A] bg-[#14141B]"
+        >
+          <button 
+            type="submit"
+            className="p-2 text-[#4D5DFE] hover:bg-[#4D5DFE]/10 transition-colors"
+          >
+            <Send size={16} />
+          </button>
+        </form>
       )}
     </div>
   );

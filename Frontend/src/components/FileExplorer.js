@@ -43,7 +43,7 @@ const getFileIcon = (fileName) => {
 };
 
 // Component to build the file tree
-const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
+const FileExplorer = ({ roomId, onFileSelect, selectedFile, initialFiles }) => {
   const [files, setFiles] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState({});
   const [loading, setLoading] = useState(true);
@@ -55,6 +55,9 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
   const [renamingItem, setRenamingItem] = useState(null);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
+  
+  // Track if initialFiles are being used
+  const [usingInitialFiles, setUsingInitialFiles] = useState(false);
   
   const menuRef = useRef(null);
   const newItemInputRef = useRef(null);
@@ -90,6 +93,31 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
 
   // Fetch files from the server
   const fetchFiles = async () => {
+    // If initial files are provided and not already loaded, use them
+    if (initialFiles && initialFiles.length > 0 && !usingInitialFiles) {
+      console.log('Using provided initial files:', initialFiles);
+      setFiles(initialFiles);
+      setLoading(false);
+      setUsingInitialFiles(true);
+      
+      // Automatically expand root level
+      const expanded = {};
+      initialFiles.forEach(file => {
+        if (file.type === 'folder' && (!file.path || !file.path.includes('/'))) {
+          expanded[file._id] = true;
+        }
+      });
+      setExpandedFolders(expanded);
+      
+      return;
+    }
+    
+    // Continue with normal fetch if no initial files or initialFiles already loaded
+    if (usingInitialFiles) {
+      console.log('Initial files already loaded, skipping fetch');
+      return;
+    }
+    
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/files/room/${roomId}`);
@@ -99,6 +127,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
       }
       
       const data = await response.json();
+      console.log('Fetched files from API:', data.files);
       setFiles(data.files || []);
       
       // Automatically expand root level
@@ -120,6 +149,11 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
 
   // Initialize files if room is empty
   const initializeFiles = async () => {
+    // If we're using initial files, don't initialize
+    if (initialFiles && initialFiles.length > 0) {
+      return;
+    }
+    
     try {
       const response = await fetch(`${API_BASE_URL}/api/files/initialize/${roomId}`, {
         method: 'POST',
@@ -141,8 +175,24 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
     }
   };
 
+  // Load files either from initialFiles or from API
   useEffect(() => {
-    if (roomId) {
+    if (initialFiles && initialFiles.length > 0) {
+      console.log('Initial files provided to FileExplorer:', initialFiles);
+      setFiles(initialFiles);
+      setLoading(false);
+      setUsingInitialFiles(true);
+      
+      // Expand root folders
+      const expanded = {};
+      initialFiles.forEach(file => {
+        if (file.type === 'folder' && (!file.path || !file.path.includes('/'))) {
+          expanded[file._id] = true;
+        }
+      });
+      setExpandedFolders(expanded);
+    } else if (roomId) {
+      console.log('No initial files, fetching from API');
       fetchFiles();
       
       // If no files were found, initialize with defaults
@@ -150,7 +200,7 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile }) => {
         initializeFiles();
       }
     }
-  }, [roomId]);
+  }, [roomId, initialFiles]);
 
   // Alias for fetchFiles to make the code clearer
   const refreshFiles = fetchFiles;

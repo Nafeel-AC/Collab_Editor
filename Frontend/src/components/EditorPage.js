@@ -26,6 +26,10 @@ const EditorPage = () => {
   const username = location.state?.username || localStorage.getItem('userName') || 'Anonymous';
   const navigate = useNavigate();
   
+  // Extract project info from location state
+  const projectId = location.state?.projectId;
+  const isExistingProject = location.state?.isExistingProject;
+  
   const [code, setCode] = useState('// Start coding here');
   const [language, setLanguage] = useState('javascript');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -48,12 +52,19 @@ const EditorPage = () => {
   const [projectDescription, setProjectDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
+  // Add state for project files
+  const [projectFiles, setProjectFiles] = useState([]);
+  const [isLoadingProject, setIsLoadingProject] = useState(isExistingProject);
+  
   const socketRef = useRef(null);
   const codeChangeRef = useRef(false);
   const debounceTimeoutRef = useRef(null);
   
   // Add state for tracking image load errors
   const [imageLoadErrors, setImageLoadErrors] = useState({});
+  
+  // Add state for mobile header dropdown
+  const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
   
   // Store username in localStorage for persistence
   useEffect(() => {
@@ -70,6 +81,8 @@ const EditorPage = () => {
     }
 
     console.log('Connecting to socket server...');
+    console.log('Room ID:', roomId);
+    console.log('Location state:', location.state);
     
     // Connect to WebSocket server
     // Get authentication token
@@ -92,14 +105,21 @@ const EditorPage = () => {
       console.log('Connected to server with socket ID:', socketRef.current.id);
       setIsConnected(true);
       
-      // Join the room
-      socketRef.current.emit('join-room', { 
+      // Prepare join-room data with all necessary parameters
+      const joinRoomData = { 
         roomId, 
         username,
-        token // Pass the token for authentication
-      });
+        token, // Pass the token for authentication
+        isExistingProject: location.state?.isExistingProject, // Pass flag if it's an existing project
+        projectId: location.state?.projectId, // Pass the projectId for loading existing data
+        createNewRoom: location.state?.isExistingProject ? true : false, // Explicitly tell server to create a new room
+        forceCreateRoom: location.state?.forceCreateRoom // Additional flag for forced room creation
+      };
       
-      console.log('Joined room:', roomId, 'as', username);
+      console.log('Joining room with data:', joinRoomData);
+      
+      // Join the room with additional information for existing projects
+      socketRef.current.emit('join-room', joinRoomData);
       
       // Request users immediately after joining
       setTimeout(() => {
@@ -107,9 +127,61 @@ const EditorPage = () => {
       }, 1000);
     });
     
+    // Listen for room closure notifications
+    socketRef.current.on('room-closed', (data) => {
+      console.log('Room has been closed:', data);
+      
+      // Show notification
+      const notification = document.createElement('div');
+      notification.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-md shadow-lg z-50 flex items-center';
+      notification.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-1 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+        </svg>
+        <span>${data.message || 'Room has been closed'}</span>
+      `;
+      
+      document.body.appendChild(notification);
+      
+      // Remove notification after 5 seconds
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 5000);
+      
+      // Disconnect from room
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+      
+      // Navigate to dashboard after a short delay
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 3000);
+    });
+    
+    // Confirmation of successful room join
+    socketRef.current.on('room-joined', (data) => {
+      console.log('Successfully joined room:', data);
+      
+      // If this was an existing project, update the document title
+      if (location.state?.isExistingProject && projectId) {
+        // Load the project data if we haven't already
+        if (!isLoadingProject && projectFiles.length === 0) {
+          console.log('Loading project data after successful room join');
+          fetchProjectData(projectId);
+        }
+      }
+      
+      // Request users since we're now successfully in the room
+      requestRoomUsers();
+    });
+    
     // Handle connection error
     socketRef.current.on('connect_error', (error) => {
       console.error('Connection error:', error);
+      console.error('Connection error details:', error.message);
       setIsConnected(false);
       
       // Try to connect again after a delay
@@ -125,19 +197,36 @@ const EditorPage = () => {
       setIsConnected(false);
     });
     
-    // Handle room users update
-    socketRef.current.on('room-users', (users) => {
-      console.log('Room users updated:', users);
-      if (Array.isArray(users)) {
-        // Debug what profile data we're getting
-        users.forEach(user => {
-          console.log(`User ${user.username} profile data:`, user);
-        });
-        setCurrentUsers(users);
+    // Listen for room not found errors
+    socketRef.current.on('room-not-found', (data) => {
+      console.error('Room not found:', data);
+      
+      // Check if this is a project open attempt
+      if (location.state?.isExistingProject) {
+        console.log('This was an attempt to open an existing project. Creating new room...');
+        
+        // Force room creation on reconnect with a flag
+        location.state.forceCreateRoom = true;
+        
+        // Try reconnecting with forced room creation
+        setTimeout(() => {
+          if (socketRef.current) {
+            console.log('Reconnecting with forced room creation...');
+            socketRef.current.connect();
+          }
+        }, 1000);
       } else {
-        console.error('Received non-array users data:', users);
-        setCurrentUsers([]);
+        // For normal room connections, show error and navigate back
+        alert(`Error: Room "${roomId}" not found. The room may have been closed or does not exist.`);
+        navigate('/dashboard');
       }
+    });
+
+    // Listen for room join errors
+    socketRef.current.on('join-room-error', (data) => {
+      console.error('Error joining room:', data);
+      alert(`Error joining room: ${data.message || 'Unknown error'}`);
+      navigate('/dashboard');
     });
     
     // Define the remote code update handler
@@ -185,12 +274,6 @@ const EditorPage = () => {
       }
     });
     
-    // Handle errors
-    socketRef.current.on('error', (error) => {
-      console.error('Socket error:', error);
-      alert(`Connection error: ${error.message}`);
-    });
-    
     // Load initial document
     socketRef.current.on('load-document', (content) => {
       console.log('Loaded document:', content);
@@ -234,18 +317,86 @@ const EditorPage = () => {
     // Set up an interval to refresh the users list every 30 seconds
     const intervalId = setInterval(() => {
       if (isConnected) {
+        console.log('Refreshing room users list...');
         requestRoomUsers();
       }
-    }, 30000);
+    }, 30000); // Changed back to 30s to prevent UI flickering
     
     // Clean up interval on unmount
     return () => clearInterval(intervalId);
   }, [isConnected, roomId]);
   
+  // Update the handler for room users to better manage the state
+  useEffect(() => {
+    if (!socketRef.current) return;
+
+    const handleRoomUsersUpdate = (users) => {
+      console.log('Room users updated:', users);
+      if (Array.isArray(users)) {
+        // Create unique user list by socket ID
+        const uniqueUsers = {};
+        users.forEach(user => {
+          // Use socketId as unique key to prevent duplicates
+          if (user.socketId) {
+            uniqueUsers[user.socketId] = user;
+          }
+        });
+
+        // Convert back to array
+        const uniqueUserArray = Object.values(uniqueUsers);
+        console.log(`Filtered to ${uniqueUserArray.length} unique users from ${users.length} total`);
+        
+        // Debug what profile data we're getting
+        uniqueUserArray.forEach(user => {
+          console.log(`User ${user.username} profile data:`, user);
+        });
+        
+        // Only update state if users have actually changed
+        const currentIds = new Set(currentUsers.map(u => u.socketId));
+        const newIds = new Set(uniqueUserArray.map(u => u.socketId));
+        
+        // Check if the sets are different sizes or contain different IDs
+        const hasUserChanges = currentIds.size !== newIds.size || 
+          [...currentIds].some(id => !newIds.has(id)) || 
+          [...newIds].some(id => !currentIds.has(id));
+        
+        if (hasUserChanges) {
+          setCurrentUsers(uniqueUserArray);
+        } else {
+          console.log('No changes in user list, skipping re-render');
+        }
+      } else {
+        console.error('Received non-array users data:', users);
+        setCurrentUsers([]);
+      }
+    };
+
+    // Set up the event listener
+    socketRef.current.on('room-users', handleRoomUsersUpdate);
+    
+    // Cleanup function to remove listener
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off('room-users', handleRoomUsersUpdate);
+      }
+    };
+  }, [socketRef.current, currentUsers]);
+  
   // Add a useEffect to fetch user profiles when users change
   useEffect(() => {
     if (currentUsers && currentUsers.length > 0) {
-      fetchUserProfiles(currentUsers);
+      // Check if we need to fetch profiles
+      const usersNeedingProfiles = currentUsers.filter(user => 
+        user.username && !user.profilePicture
+      );
+      
+      if (usersNeedingProfiles.length > 0) {
+        console.log('Fetching profiles for users without profile data:', 
+          usersNeedingProfiles.map(u => u.username));
+        fetchUserProfiles(currentUsers);
+      } else {
+        console.log('All users have profile data, skipping fetch');
+      }
     }
   }, [currentUsers]);
   
@@ -449,6 +600,7 @@ const EditorPage = () => {
               setActiveTab('editor'); // Switch back to editor after selecting a file
             }}
             selectedFile={selectedFile}
+            initialFiles={isExistingProject ? projectFiles : undefined}
           />
         );
       default:
@@ -567,11 +719,37 @@ const EditorPage = () => {
     }
   };
   
+  // Function to handle closing the room without saving
+  const closeRoomWithoutSave = async () => {
+    // Show confirmation and wait for response
+    const isConfirmed = window.confirm('Are you sure you want to close this room without saving? All changes will be lost.');
+    
+    // Only proceed if confirmed
+    if (isConfirmed) {
+      try {
+        // Notify all users in the room that it's being closed
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('close-room', {
+            roomId,
+            username,
+            savedProject: false
+          });
+        }
+        
+        await finishRoomClose();
+      } catch (error) {
+        console.error("Error closing room:", error);
+        alert("Failed to close room. Please try again.");
+      }
+    }
+  };
+  
   // Function to handle closing the room
   const closeRoom = async () => {
     // Show confirmation
     const isConfirmed = window.confirm('Are you sure you want to close this room? All unsaved changes will be lost.');
     
+    // Only proceed if confirmed
     if (isConfirmed) {
       // Show save project modal if applicable
       const shouldSave = window.confirm('Would you like to save this project before closing?');
@@ -579,8 +757,17 @@ const EditorPage = () => {
       if (shouldSave) {
             setShowSaveModal(true);
           } else {
-        // Directly close the room without saving
-        await finishRoomClose();
+        // Notify all users in the room that it's being closed without saving
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('close-room', {
+            roomId,
+            username,
+            savedProject: false
+          });
+        }
+        
+        // Close without saving
+        await closeRoomWithoutSave();
       }
     }
   };
@@ -616,6 +803,15 @@ const EditorPage = () => {
       setIsSaving(false);
       setShowSaveModal(false);
       
+      // Notify all users in the room that it's being closed after saving
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('close-room', {
+          roomId,
+          username,
+          savedProject: true
+        });
+      }
+      
       // Show success message
       alert('Project saved successfully!');
       
@@ -633,22 +829,28 @@ const EditorPage = () => {
     setShowSaveModal(false);
   };
   
-  // Function to finish room closure proce
+  // Function to finish room closure process
   const finishRoomClose = async () => {
     try {
-      // Clean up on server
-      await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
+      // Only attempt to delete the room if it's a newly created room
+      // If it's an existing project opened from the dashboard, just navigate away
+      if (!location.state?.isExistingProject) {
+        // Clean up on server
+        await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
           headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      console.log('Room closed successfully');
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        console.log('Room closed successfully');
+      } else {
+        console.log('Navigating away from existing project without deleting room');
+      }
       
       // Clean up socket
       if (socketRef.current) {
         if (socketRef.current.connected) {
-          socketRef.current.emit('leave-room', { roomId });
+      socketRef.current.emit('leave-room', { roomId });
         }
         socketRef.current.disconnect();
       }
@@ -664,7 +866,7 @@ const EditorPage = () => {
   };
   
   // Function to handle beforeunload event
-  const handleBeforeUnload = async (e) => {
+    const handleBeforeUnload = async (e) => {
     // Show a confirmation dialog to the user
     const message = 'Are you sure you want to leave? Any unsaved changes will be lost.';
     e.returnValue = message;
@@ -691,6 +893,106 @@ const EditorPage = () => {
     };
   }, []);
   
+  // Load project data if this is an existing project
+  useEffect(() => {
+    // If this is an existing project, fetch the project data
+    if (isExistingProject && projectId) {
+      console.log(`Loading existing project (ID: ${projectId}) into room: ${roomId}`);
+      fetchProjectData(projectId);
+      
+      // Update document title to show it's an existing project
+      document.title = `Loading project... - ${roomId}`;
+    } else {
+      document.title = `Collaborative Editor - ${roomId}`;
+    }
+  }, [projectId, isExistingProject, roomId]);
+  
+  // Function to fetch project data
+  const fetchProjectData = async (projectId) => {
+    try {
+      setIsLoadingProject(true);
+      
+      // Get authentication token
+          const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+      
+      console.log(`Fetching project data for project ID: ${projectId}`);
+      
+      // Fetch project details
+      const response = await axios.get(`${API_BASE_URL}/api/projects/${projectId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (response.data) {
+        console.log('Project data loaded:', response.data);
+        
+        // Store project info
+        setProjectName(response.data.name || '');
+        setProjectDescription(response.data.description || '');
+        document.title = `${response.data.name || 'Project'} - ${roomId}`;
+        
+        // Load files from project
+        if (response.data.files && Array.isArray(response.data.files)) {
+          console.log('Project files found:', response.data.files.length);
+          setProjectFiles(response.data.files);
+          
+          // If there are files, select the first one to display in the editor
+          if (response.data.files.length > 0) {
+            const mainFile = response.data.files[0];
+            console.log('Setting main file:', mainFile);
+            setSelectedFile(mainFile);
+            setCode(mainFile.content || '// Start coding here');
+            
+            // If we have a language extension, set the editor language
+            if (mainFile.name) {
+              const extension = mainFile.name.split('.').pop().toLowerCase();
+              switch (extension) {
+                case 'js':
+                  setLanguage('javascript');
+                  break;
+                case 'py':
+                  setLanguage('python');
+                  break;
+                case 'java':
+                  setLanguage('java');
+                  break;
+                case 'cpp':
+                case 'c':
+                  setLanguage('cpp');
+                  break;
+                case 'html':
+                  setLanguage('html');
+                  break;
+                case 'css':
+                  setLanguage('css');
+                  break;
+                case 'json':
+                  setLanguage('json');
+                  break;
+                case 'md':
+                  setLanguage('markdown');
+                  break;
+                default:
+                  // Keep default language
+                  break;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching project data:', error);
+      alert(`Error loading project: ${error.response?.data?.message || error.message}`);
+    } finally {
+      setIsLoadingProject(false);
+    }
+  };
+  
   return (
     <div className="flex flex-col h-screen bg-[#14141B] text-white">
       {/* Header */}
@@ -698,7 +1000,7 @@ const EditorPage = () => {
         {/* Mobile Menu Button */}
         <div className="md:hidden">
           <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            onClick={() => setShowMobileHeaderMenu(!showMobileHeaderMenu)}
             className="text-white"
           >
             <Menu size={24} />
@@ -721,7 +1023,7 @@ const EditorPage = () => {
             )}
             
             <h1 className="text-lg md:text-xl font-bold truncate max-w-[150px] md:max-w-none">
-              {roomId}
+              {projectName ? `${projectName} (${roomId})` : roomId}
             </h1>
             
             {/* Desktop buttons */}
@@ -739,6 +1041,13 @@ const EditorPage = () => {
             >
               <X className="h-4 w-4 mr-1" />
               Close
+            </button>
+              <button
+                onClick={closeRoomWithoutSave}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+              >
+                <AlertCircle className="h-4 w-4 mr-1" />
+                Close without saving
             </button>
             </div>
           </div>
@@ -760,6 +1069,64 @@ const EditorPage = () => {
         </div>
       </header>
       
+      {/* Mobile Header Menu */}
+      {showMobileHeaderMenu && (
+        <div className="md:hidden absolute top-16 right-0 z-50 bg-[#1E1E29] border-l border-b border-[#2A2A3A] shadow-xl rounded-bl-md w-64">
+          <div className="p-4 space-y-3">
+            <button
+              onClick={() => {
+                copyRoomId();
+                setShowMobileHeaderMenu(false);
+              }}
+              className="w-full bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share Room
+            </button>
+                  <button 
+              onClick={() => {
+                setShowSaveModal(true);
+                setShowMobileHeaderMenu(false);
+              }}
+              className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Save Project
+            </button>
+            <button
+              onClick={() => {
+                closeRoomWithoutSave();
+                setShowMobileHeaderMenu(false);
+              }}
+              className="w-full bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors"
+            >
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Close Without Saving
+            </button>
+            <button
+              onClick={() => {
+                closeRoom();
+                setShowMobileHeaderMenu(false);
+              }}
+              className="w-full bg-[#E94560] hover:bg-[#D32F4D] text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Close Room
+                  </button>
+                </div>
+              </div>
+            )}
+      
+      {/* Loading indicator for projects */}
+      {isLoadingProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-[#1E1E29] rounded-lg p-6 flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4D5DFE]"></div>
+            <p className="mt-4 text-white">Loading project...</p>
+          </div>
+        </div>
+      )}
+      
       {/* Desktop Layout */}
       <div className="hidden md:flex flex-1 overflow-hidden">
         {/* File Explorer */}
@@ -769,6 +1136,7 @@ const EditorPage = () => {
               roomId={roomId}
               onFileSelect={handleFileSelect}
               selectedFile={selectedFile}
+              initialFiles={isExistingProject ? projectFiles : undefined}
             />
           </div>
         )}

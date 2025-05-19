@@ -39,25 +39,54 @@ export const AnimatedTooltip = ({
   size = 40 // Add size prop with default value
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const prevItemsRef = useRef([]); 
   const springConfig = { stiffness: 100, damping: 5 };
   const x = useMotionValue(0); // going to set this value on mouse move
   // rotate the tooltip
   const rotate = useSpring(useTransform(x, [-100, 100], [-45, 45]), springConfig);
   // translate the tooltip
   const translateX = useSpring(useTransform(x, [-100, 100], [-50, 50]), springConfig);
+  
   const handleMouseMove = (event) => {
     const halfWidth = event.target.offsetWidth / 2;
     x.set(event.nativeEvent.offsetX - halfWidth); // set the x value, which is then used in transform and rotate
   };
 
+  // Prevent re-renders when items array changes but contains the same data
+  useEffect(() => {
+    // Check if items actually changed in a meaningful way
+    const currentIds = items.map(item => item.id).sort().join(',');
+    const prevIds = prevItemsRef.current.map(item => item.id).sort().join(',');
+    
+    // Only update ref if the IDs actually changed
+    if (currentIds !== prevIds) {
+      prevItemsRef.current = items;
+    }
+  }, [items]);
+
   return (
-    <div className="flex items-center justify-center">
+    <motion.div 
+      className="flex items-center justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
       {items.map((item, idx) => (
-        <div
+        <motion.div
           className="group relative -mr-2"
           key={item.id || item.name || idx}
           onMouseEnter={() => setHoveredIndex(item.id)}
-          onMouseLeave={() => setHoveredIndex(null)}>
+          onMouseLeave={() => setHoveredIndex(null)}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ 
+            duration: 0.3, 
+            delay: idx * 0.05,
+            type: "spring",
+            stiffness: 260, 
+            damping: 20 
+          }}
+        >
           <AnimatePresence mode="popLayout">
             {hoveredIndex === item.id && (
               <motion.div
@@ -97,8 +126,8 @@ export const AnimatedTooltip = ({
             className={`relative !m-0 rounded-full border-2 border-white object-cover object-top !p-0 transition duration-500 group-hover:z-30 group-hover:scale-105`} 
             style={{ height: `${size}px`, width: `${size}px` }}
           />
-        </div>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 };

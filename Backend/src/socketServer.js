@@ -79,18 +79,57 @@ export const initSocketServer = (io) => {
     });
 
     // Handle joining a room
-    socket.on("join-room", async ({ roomId, username: joinUsername }) => {
+    socket.on("join-room", async ({ roomId, username: joinUsername, isExistingProject, projectId, createNewRoom, forceCreateRoom }) => {
       try {
-        // Check if room exists
-        const room = await Room.findOne({ roomId });
+        console.log(`JOIN ROOM REQUEST:`, { 
+          roomId, 
+          username: joinUsername, 
+          isExistingProject: !!isExistingProject, 
+          projectId, 
+          createNewRoom: !!createNewRoom,
+          forceCreateRoom: !!forceCreateRoom
+        });
         
-        if (!room) {
-          socket.emit("error", { message: "Room not found" });
+        // Input validation
+        if (!roomId || typeof roomId !== 'string') {
+          console.error(`Invalid roomId:`, roomId);
+          socket.emit("join-room-error", { message: "Invalid room ID" });
           return;
+        }
+        
+        let room;
+        
+        // If this is an existing project being opened in a new room or if createNewRoom/forceCreateRoom is set
+        if (isExistingProject || createNewRoom || forceCreateRoom) {
+          try {
+            console.log(`Using findOrCreateRoom for ${roomId} (project: ${projectId || 'unknown'})`);
+            // Use the reliable method to find or create the room
+            room = await Room.findOrCreateRoom(roomId);
+          } catch (roomError) {
+            console.error(`Error finding/creating room:`, roomError);
+            socket.emit("join-room-error", { 
+              message: `Failed to create room: ${roomError.message}`,
+              details: roomError.toString()
+            });
+            return;
+          }
+        } else {
+          // Just find the room without creating it for normal room joins
+          room = await Room.findOne({ roomId });
+          
+          console.log(`Room lookup for ${roomId}: ${room ? 'FOUND' : 'NOT FOUND'}`);
+          
+          if (!room) {
+            // Room doesn't exist and should not be created
+            console.log(`Room not found: ${roomId}`);
+            socket.emit("room-not-found", { roomId });
+            return;
+          }
         }
         
         // Leave current room if any
         if (currentRoom) {
+          console.log(`User ${socket.id} leaving current room: ${currentRoom}`);
           socket.leave(currentRoom);
           removeUserFromRoom(currentRoom, socket.id);
         }
@@ -123,9 +162,15 @@ export const initSocketServer = (io) => {
         
         console.log(`User ${socket.id} (${username}) joined room ${roomId}. Total users: ${updatedUsers.length}`);
         
+        // Confirm successful join to the client
+        socket.emit("room-joined", { roomId, success: true });
+        
       } catch (error) {
         console.error("Error joining room:", error);
-        socket.emit("error", { message: "Error joining room" });
+        socket.emit("join-room-error", { 
+          message: "Error joining room: " + error.message,
+          details: error.toString()
+        });
       }
     });
 
@@ -395,6 +440,34 @@ export const initSocketServer = (io) => {
         }
       } catch (error) {
         console.error("Error leaving room:", error);
+      }
+    });
+
+    // Handle room closure (notify all users)
+    socket.on("close-room", async ({ roomId, username, savedProject }) => {
+      try {
+        console.log(`User ${username} (${socket.id}) is closing room ${roomId}. Project saved: ${savedProject ? 'Yes' : 'No'}`);
+        
+        // Notify all users in the room that it's being closed
+        io.to(roomId).emit("room-closed", { 
+          roomId,
+          closedBy: username,
+          savedProject,
+          message: `Room closed by ${username}${savedProject ? ' (project saved)' : ' (without saving)'}`
+        });
+        
+        // Mark room as inactive in database if needed
+        try {
+          await Room.findOneAndUpdate(
+            { roomId },
+            { active: false, updatedAt: new Date() }
+          );
+          console.log(`Room ${roomId} marked as inactive in database`);
+        } catch (dbError) {
+          console.error(`Error updating room status:`, dbError);
+        }
+      } catch (error) {
+        console.error("Error closing room:", error);
       }
     });
 

@@ -1426,14 +1426,24 @@ function Dashboard() {
   const handleOpenProject = (projectId) => {
     try {
       setLoading(true);
-      // Navigate to the editor with the project ID
-      navigate(`/editor/${projectId}`, { 
+      
+      // Generate a new room ID for this session
+      const newRoomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      
+      console.log(`Opening project ${projectId} in a new room: ${newRoomId}`);
+      
+      // Navigate to the editor with the new room ID and project info
+      navigate(`/editor/${newRoomId}`, { 
         state: { 
           username: userName,
-          originalProjectId: projectId 
+          originalProjectId: projectId,
+          isExistingProject: true, // Flag to indicate this is an existing project
+          projectId: projectId, // The actual project ID to load content from
+          createNewRoom: true // Explicitly tell server to create a new room
         } 
       });
-      showSuccess('Opening project...');
+      
+      showSuccess('Opening project in a new collaborative session...');
     } catch (err) {
       console.error('Error opening project:', err);
       showError('Failed to open project');
@@ -2848,7 +2858,7 @@ function Dashboard() {
                             } ${message.pending ? 'opacity-70' : ''}`}
                           >
                               <p className="text-sm">{message.text}</p>
-                              <p className="text-xs text-right opacity-70">
+                            <p className="text-xs text-right opacity-70">
                                 {(() => {
                                   try {
                                     const dateObj = typeof message.timestamp === 'object' 
@@ -2866,19 +2876,19 @@ function Dashboard() {
                                     return 'Just now';
                                   }
                                 })()}
-                                {message.pending && ' • Sending...'}
-                                {message.error && ' • Failed to send'}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Message input */}
+                              {message.pending && ' • Sending...'}
+                              {message.error && ' • Failed to send'}
+                        </p>
+                      </div>
+                        </div>
+                  );
+                    })}
+              <div ref={messagesEndRef} />
+                  </div>
+                )}
+            </div>
+
+            {/* Message input */}
                 <div className="p-3 border-t border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm">
               <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
                 <input
