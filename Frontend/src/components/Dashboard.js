@@ -76,7 +76,7 @@ function Dashboard() {
 
   // Add state for mobile sidebar visibility
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  
+
   // Create a ref to store the current message timeout
   const messageTimeoutRef = useRef(null);
 
@@ -1631,9 +1631,9 @@ function Dashboard() {
           <div className="flex items-center space-x-2">
             <div className="relative">
               <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-md"></div>
-              <img
-                src={userProfile?.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${userName}&background=4D5DFE&color=fff`)}
-                alt={userName}
+              <img 
+                src={userProfile?.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${userName}&background=4D5DFE&color=fff`)} 
+                  alt={userName}
                 className="w-8 h-8 rounded-full object-cover relative z-10"
               />
             </div>
@@ -1642,7 +1642,7 @@ function Dashboard() {
             </button>
           </div>
         </div>
-      </div>
+        </div>
 
       {/* Left Sidebar */}
       {showLeftSidebar && (
@@ -1651,12 +1651,12 @@ function Dashboard() {
           <div className="fixed top-16 left-0 h-full w-64 bg-[#14141B] border-r border-[#2A2A3A] z-50 shadow-lg overflow-hidden">
             <div className="p-4 border-b border-[#2A2A3A] flex justify-between items-center">
               <h2 className="font-medium">Menu</h2>
-              <button 
+            <button 
                 onClick={() => setShowLeftSidebar(false)}
                 className="text-[#8F8FA3] hover:text-white p-1 rounded"
-              >
+          >
                 <X size={18} />
-              </button>
+            </button>
             </div>
             <div className="p-3">
               <button

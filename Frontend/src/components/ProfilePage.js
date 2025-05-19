@@ -1637,58 +1637,9 @@ const ProfilePage = () => {
                 <h2 className="text-lg font-semibold">Account Settings</h2>
               </div>
               
-              {/* Theme Settings */}
-              <div className="mb-6">
-                <h3 className="text-sm font-medium text-[#D1D1E0] mb-3">Theme Preference</h3>
-                <div className="flex space-x-3">
-                  <label className="inline-flex items-center">
-                    <input
-                      type="radio"
-                      name="theme"
-                      value="light"
-                      checked={theme === 'light'}
-                      onChange={() => handleThemeChange('light')}
-                      className="form-radio h-4 w-4 text-[#4D5DFE] focus:ring-[#4D5DFE] border-[#2A2A3A] bg-[#1E1E29]"
-                    />
-                    <span className="ml-2 text-sm text-[#D1D1E0]">Light Mode</span>
-                  </label>
-                  
-                  <label className="inline-flex items-center">
-                    <input
-                      type="radio"
-                      name="theme"
-                      value="dark"
-                      checked={theme === 'dark'}
-                      onChange={() => handleThemeChange('dark')}
-                      className="form-radio h-4 w-4 text-[#4D5DFE] focus:ring-[#4D5DFE] border-[#2A2A3A] bg-[#1E1E29]"
-                    />
-                    <span className="ml-2 text-sm text-[#D1D1E0]">Dark Mode</span>
-                  </label>
-                  
-                  <label className="inline-flex items-center">
-                    <input
-                      type="radio"
-                      name="theme"
-                      value="system"
-                      checked={theme === 'system'}
-                      onChange={() => handleThemeChange('system')}
-                      className="form-radio h-4 w-4 text-[#4D5DFE] focus:ring-[#4D5DFE] border-[#2A2A3A] bg-[#1E1E29]"
-                    />
-                    <span className="ml-2 text-sm text-[#D1D1E0]">System Default</span>
-                  </label>
-                </div>
-              </div>
-              
               {/* Account Management */}
-              <div className="border-t border-[#2A2A3A] pt-6">
+              <div>
                 <h3 className="text-sm font-medium text-[#D1D1E0] mb-3">Account Management</h3>
-                
-                <button 
-                  onClick={() => navigate('/change-password')}
-                  className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] text-[#D1D1E0] px-4 py-2 rounded-md text-sm text-left mb-3 transition-colors duration-200"
-                >
-                  Change Password
-                </button>
                 
                 <button 
                   onClick={() => {
@@ -1697,16 +1648,9 @@ const ProfilePage = () => {
                       navigate('/login');
                     }
                   }}
-                  className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] text-[#D1D1E0] px-4 py-2 rounded-md text-sm text-left mb-3 transition-colors duration-200"
+                  className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] text-[#D1D1E0] px-4 py-2 rounded-md text-sm text-left transition-colors duration-200"
                 >
                   Sign Out
-                </button>
-                
-                <button 
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="w-full bg-[#E94560]/10 hover:bg-[#E94560]/20 text-[#E94560] px-4 py-2 rounded-md text-sm text-left transition-colors duration-200"
-                >
-                  Delete Account
                 </button>
               </div>
             </div>
