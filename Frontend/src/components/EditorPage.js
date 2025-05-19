@@ -12,7 +12,7 @@ import { css } from '@codemirror/lang-css';
 import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import { githubDark } from '@uiw/codemirror-theme-github';
-import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle, FileText, Terminal, Code, Menu, Play, RefreshCw } from 'lucide-react';
+import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle, FileText, Terminal, Code, Menu, Play, RefreshCw, MessageSquare, Send, ChevronLeft, UserPlus, Bell, Search } from 'lucide-react';
 import axios from 'axios';
 import { AnimatedTooltip } from './ui/animated-tooltip';
 
@@ -56,6 +56,18 @@ const EditorPage = () => {
   const [projectFiles, setProjectFiles] = useState([]);
   const [isLoadingProject, setIsLoadingProject] = useState(isExistingProject);
   
+  // Chat functionality state
+  const [showChat, setShowChat] = useState(false);
+  const [friends, setFriends] = useState([]);
+  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [friendSearchTerm, setFriendSearchTerm] = useState('');
+  const [userId, setUserId] = useState(localStorage.getItem('userId'));
+  const messagesEndRef = useRef(null);
+  const messageTimeoutRef = useRef(null);
+  
   const socketRef = useRef(null);
   const codeChangeRef = useRef(false);
   const debounceTimeoutRef = useRef(null);
@@ -82,38 +94,57 @@ const EditorPage = () => {
 
     console.log('Connecting to socket server...');
     console.log('Room ID:', roomId);
-    console.log('Location state:', location.state);
     
-    // Connect to WebSocket server
     // Get authentication token
     const token = localStorage.getItem('token');
     
+    if (!token) {
+      console.error('No authentication token found');
+      // You might want to redirect to login or show a message
+      return;
+    }
+    
+    // Get userId from localStorage or set it if not available
+    const storedUserId = localStorage.getItem('userId');
+    if (storedUserId) {
+      setUserId(storedUserId);
+    }
+    
+    // Create socket with same configuration as Dashboard
     socketRef.current = io(API_BASE_URL, {
-      withCredentials: true,
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      auth: {
-        token: token
+      timeout: 20000,
+      transports: ['polling', 'websocket'], // Try polling first like Dashboard
+      query: { 
+        userId: storedUserId || 'anonymous',
+        token: token // Pass token in query params
       },
-      timeout: 10000 // Add a longer timeout
+      autoConnect: true,
+      forceNew: true
     });
     
     // Handle connection events
     socketRef.current.on('connect', () => {
       console.log('Connected to server with socket ID:', socketRef.current.id);
+      console.log('Transport used:', socketRef.current.io.engine.transport.name);
       setIsConnected(true);
+      
+      // Authenticate socket explicitly - THIS IS CRITICAL
+      socketRef.current.emit('authenticate', { 
+        token: token,
+        userId: storedUserId 
+      });
       
       // Prepare join-room data with all necessary parameters
       const joinRoomData = { 
         roomId, 
         username,
         token, // Pass the token for authentication
-        isExistingProject: location.state?.isExistingProject, // Pass flag if it's an existing project
-        projectId: location.state?.projectId, // Pass the projectId for loading existing data
-        createNewRoom: location.state?.isExistingProject ? true : false, // Explicitly tell server to create a new room
-        forceCreateRoom: location.state?.forceCreateRoom // Additional flag for forced room creation
+        isExistingProject: location.state?.isExistingProject,
+        projectId: location.state?.projectId,
+        createNewRoom: location.state?.isExistingProject ? true : false,
+        forceCreateRoom: location.state?.forceCreateRoom
       };
       
       console.log('Joining room with data:', joinRoomData);
@@ -993,6 +1024,615 @@ const EditorPage = () => {
     }
   };
   
+  // Chat functionality methods
+  
+  // Fetch friends list
+  const fetchFriends = async () => {
+    try {
+      setMessagesLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No authentication token found');
+        return;
+      }
+      
+      console.log('Fetching friends...');
+      const response = await axios.get(`${API_BASE_URL}/api/users/friends`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      console.log('Friends API response:', response.data);
+      
+      // Process friends data
+      const friendsData = response.data;
+      
+      if (Array.isArray(friendsData)) {
+        console.log(`Found ${friendsData.length} friends`);
+        
+        const mappedFriends = friendsData.map(friend => {
+          console.log('Friend object from API:', friend);
+          
+          // Process profile picture URL
+          let profilePicUrl = null;
+          
+          if (friend.profilePic) {
+            // Handle server-side uploaded images
+            if (friend.profilePic.startsWith('/uploads/')) {
+              profilePicUrl = getImageUrl(friend.profilePic);
+              console.log('Using server uploaded profile picture:', profilePicUrl);
+            } 
+            // Handle fully qualified URLs (already starting with http)
+            else if (friend.profilePic.startsWith('http')) {
+              profilePicUrl = friend.profilePic;
+              console.log('Using full URL profile picture:', profilePicUrl);
+            }
+            // Handle partial paths that need server prefix
+            else {
+              profilePicUrl = getImageUrl(friend.profilePic);
+              console.log('Using prefixed profile picture:', profilePicUrl);
+            }
+          } else {
+            // Fallback to UI Avatars
+            profilePicUrl = getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || 'Unknown')}&background=random`);
+            console.log('Using UI Avatars fallback:', profilePicUrl);
+          }
+          
+          return {
+            _id: friend._id,
+            id: friend._id,
+            name: friend.userName || 'Unknown User',
+            userName: friend.userName || 'Unknown User',
+            status: 'Online',
+            online: true,
+            avatar: profilePicUrl,
+            profilePic: profilePicUrl
+          };
+        });
+        
+        console.log('Mapped friends with profile pics:', mappedFriends);
+        setFriends(mappedFriends);
+      } else if (response.data && response.data.friends && Array.isArray(response.data.friends)) {
+        console.log(`Found ${response.data.friends.length} friends in nested structure`);
+        // Handle alternative response structure with a 'friends' property
+        setFriends(response.data.friends);
+      } else {
+        console.warn('Unexpected friends data structure:', friendsData);
+      }
+    } catch (err) {
+      console.error('Error fetching friends:', err.response?.data || err.message || err);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+  
+  // Fetch messages for selected friend
+  const fetchMessages = async (friendId) => {
+    if (!friendId) {
+      console.error('Invalid friend ID provided to fetchMessages:', friendId);
+      return;
+    }
+
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const attemptFetch = async () => {
+      try {
+        setMessagesLoading(true);
+        console.log(`Fetching messages for friend ID: ${friendId}`);
+        
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/api/messages/${friendId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const messagesData = await response.json();
+          console.log('Raw messages data:', messagesData);
+          
+          // Process messages to ensure valid timestamps
+          const processedMessages = messagesData.map(msg => {
+            // Safely create date objects
+            let timestamp = null;
+            try {
+              timestamp = new Date(msg.createdAt || msg.timestamp || Date.now());
+              // Verify it's a valid date
+              if (isNaN(timestamp.getTime())) {
+                timestamp = new Date(); // Fallback to current time if invalid
+              }
+            } catch (e) {
+              console.error('Error parsing message timestamp:', e);
+              timestamp = new Date(); // Fallback to current time
+            }
+            
+            return {
+              ...msg,
+              parsedTimestamp: timestamp // Add a reliable timestamp field
+            };
+          });
+          
+          // Sort messages by the validated timestamp
+          const sortedMessages = processedMessages.sort((a, b) => 
+            a.parsedTimestamp - b.parsedTimestamp
+          );
+          
+          console.log(`Fetched ${sortedMessages.length} messages with ${friendId}`);
+          setMessages(sortedMessages);
+          
+          // Mark received messages as read
+          if (socketRef.current && socketRef.current.connected && sortedMessages.some(msg => msg.sender === friendId && !msg.read)) {
+            console.log('Marking messages as read');
+            socketRef.current.emit('mark-messages-read', { senderId: friendId });
+          }
+          
+          // Scroll to bottom of messages
+          setTimeout(() => {
+            if (messagesEndRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            }
+          }, 100);
+        } else {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('Failed to fetch messages:', errorData);
+          
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`Retrying message fetch (${retryCount}/${maxRetries})...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return attemptFetch();
+          } else {
+            console.error(`Could not load messages. ${errorData.error || response.statusText}`);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching messages:', err);
+        
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`Retrying message fetch after error (${retryCount}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return attemptFetch();
+        } else {
+          console.error('Failed to load messages after multiple attempts');
+        }
+      } finally {
+        setMessagesLoading(false);
+      }
+    };
+    
+    // Start the fetch process
+    await attemptFetch();
+  };
+  
+  // Handle sending a message
+  const handleSendMessage = async (e) => {
+    if (e) e.preventDefault();
+    
+    if (!newMessage.trim() || !selectedFriend) {
+      console.log("Cannot send empty message or no friend selected");
+      return;
+    }
+    
+    if (!socketRef.current) {
+      console.error("Socket connection not established");
+      return;
+    }
+
+    try {
+      // Generate a unique reference ID for this message
+      const messageRefId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      const messageToSend = newMessage.trim();
+      
+      // Ensure we have the correct friend ID format
+      const friendId = selectedFriend._id || selectedFriend.id;
+      
+      console.log(`DEBUG: Sending message to ${friendId} with refId: ${messageRefId}`);
+      console.log('DEBUG: Socket ID:', socketRef.current.id);
+      console.log('DEBUG: Socket connected:', socketRef.current.connected);
+      
+      // Clear any existing timeout
+      if (messageTimeoutRef.current) {
+        console.log('DEBUG: Clearing existing timeout before sending new message');
+        clearTimeout(messageTimeoutRef.current);
+        messageTimeoutRef.current = null;
+      }
+      
+      // Add message to local state immediately for responsiveness
+      const tempMessage = {
+        id: messageRefId, // Use our reference ID
+        senderId: userId,
+        senderName: username,
+        receiverId: friendId,
+        text: messageToSend,
+        timestamp: new Date(),
+        pending: true,
+        refId: messageRefId // Store reference ID for easier matching
+      };
+      
+      setMessages(prevMessages => [...prevMessages, tempMessage]);
+      
+      // Clear message input before sending to avoid multiple sends on rapid clicks
+      setNewMessage('');
+      
+      // Check if socket is connected
+      console.log('DEBUG: Socket connected status before sending:', socketRef.current.connected);
+      
+      // Set new timeout - we'll use this as a backup in case the socket acknowledgment fails
+      messageTimeoutRef.current = setTimeout(() => {
+        console.log(`DEBUG: Message send timed out for refId: ${messageRefId}`);
+        
+        // Update message status to error
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            (msg.refId === messageRefId || msg.id === messageRefId)
+              ? {...msg, error: true, pending: false} 
+              : msg
+          )
+        );
+        
+        // Clear the reference
+        messageTimeoutRef.current = null;
+      }, 5000);
+      
+      console.log('DEBUG: About to emit send-direct-message event');
+      
+      // Send the message with acknowledgment callback - EXACTLY as in Dashboard
+      socketRef.current.emit('send-direct-message', {
+        receiverId: friendId,
+        message: messageToSend,
+        refId: messageRefId // Include reference ID in the socket message
+      }, (response) => {
+        // This is the acknowledgment callback
+        console.log('DEBUG: Message send acknowledgment received:', response);
+        
+        // Clear timeout since we received server response (success or error)
+        if (messageTimeoutRef.current) {
+          clearTimeout(messageTimeoutRef.current);
+          messageTimeoutRef.current = null;
+        }
+        
+        if (response && response.success) {
+          // Message was successfully received by server
+          console.log(`DEBUG: Message ${messageRefId} successfully delivered to server`);
+          
+          // Update the message status to sent immediately rather than waiting for receive-direct-message
+          setMessages(prevMessages => 
+            prevMessages.map(msg => 
+              (msg.refId === messageRefId || msg.id === messageRefId)
+                ? {...msg, pending: false, delivered: true, messageId: response.messageId || msg.id} 
+                : msg
+            )
+          );
+        } else {
+          // Server reported an error
+          console.error('DEBUG: Server reported error with message:', response?.error || 'Unknown error');
+          
+          // Update message status to error
+          setMessages(prevMessages => 
+            prevMessages.map(msg => 
+              (msg.refId === messageRefId || msg.id === messageRefId)
+                ? {...msg, error: true, pending: false} 
+                : msg
+            )
+          );
+          
+          // Try to reconnect if authentication is the issue
+          if (response?.error?.includes('authenticated') && socketRef.current) {
+            console.log('Trying to reconnect socket due to auth error...');
+            // Re-authenticate
+            const token = localStorage.getItem('token');
+            if (token) {
+              socketRef.current.emit('authenticate', { 
+                token, 
+                userId: localStorage.getItem('userId') 
+              });
+            }
+          }
+        }
+      });
+      
+      console.log('DEBUG: Emitted send-direct-message event');
+    } catch (err) {
+      console.error('DEBUG: Error in handleSendMessage:', err);
+    }
+  };
+  
+  // Handle selecting a friend to chat with
+  const handleSelectFriend = (friend) => {
+    console.log('Selected friend for chat:', friend);
+    setSelectedFriend(friend);
+    fetchMessages(friend._id || friend.id);
+  };
+  
+  // Add useEffect to load friends when chat is opened
+  useEffect(() => {
+    if (showChat && friends.length === 0) {
+      fetchFriends();
+    }
+  }, [showChat]);
+  
+  // Add socket event listeners for messaging
+  useEffect(() => {
+    if (socketRef.current) {
+      console.log('Setting up messaging event listeners');
+      
+      // Handle socket authentication success
+      const handleAuthenticated = (data) => {
+        console.log('Socket authenticated successfully for user:', data.userId);
+      };
+      
+      // Handle socket authentication error
+      const handleAuthError = (error) => {
+        console.error('Socket authentication error:', error);
+        // Re-authenticate with current token
+        const token = localStorage.getItem('token');
+        const storedUserId = localStorage.getItem('userId');
+        if (token && socketRef.current && socketRef.current.connected) {
+          console.log('Trying to re-authenticate socket...');
+          socketRef.current.emit('authenticate', { token, userId: storedUserId });
+        }
+      };
+      
+      // Handle socket reconnect
+      const handleReconnect = (attempt) => {
+        console.log(`Socket reconnected after ${attempt} attempts`);
+        // Re-authenticate after reconnect
+        const token = localStorage.getItem('token');
+        const storedUserId = localStorage.getItem('userId');
+        if (token && socketRef.current) {
+          socketRef.current.emit('authenticate', { token, userId: storedUserId });
+        }
+      };
+      
+      // Handle incoming messages - match Dashboard implementation exactly
+      const handleIncomingMessage = (data) => {
+        console.log('Received message event:', data);
+        
+        if (data && (data.senderId || data.sender)) {
+          // Extract message information with fallbacks for different formats
+          const msgSenderId = data.senderId || data.sender;
+          const msgText = data.text || data.message;
+          const msgRefId = data.refId || null;
+          
+          // Verify the received message is from the currently selected friend
+          // Compare both _id and id to be safe
+          let isFromSelectedFriend = false;
+          if (selectedFriend) {
+            const selectedFriendId = selectedFriend._id || selectedFriend.id;
+            isFromSelectedFriend = msgSenderId === selectedFriendId || 
+                                  msgSenderId === selectedFriend._id || 
+                                  msgSenderId === selectedFriend.id;
+          }
+          
+          // Only process if we're currently chatting with this person
+          if (isFromSelectedFriend) {
+            console.log(`Received message: "${msgText}" from ${msgSenderId} with refId: ${msgRefId}`);
+            
+            // Create new message object with consistent format
+            const newMsg = {
+              id: data.id || `recv_${Date.now()}`,
+              senderId: msgSenderId,
+              senderName: data.senderName || 'Unknown',
+              receiverId: userId,
+              text: msgText,
+              timestamp: new Date(data.timestamp || data.createdAt || Date.now()),
+              refId: msgRefId // Store the reference ID
+            };
+            
+            setMessages(prevMessages => {
+              // First try to find a pending message with matching refId
+              if (msgRefId) {
+                const pendingIndex = prevMessages.findIndex(msg => 
+                  msg.pending && (msg.refId === msgRefId || msg.id === msgRefId)
+                );
+                
+                if (pendingIndex !== -1) {
+                  console.log(`Found pending message with matching refId: ${msgRefId}`);
+                  
+                  // Clear timeout since we received acknowledgment
+                  if (messageTimeoutRef.current) {
+                    console.log('Clearing message timeout as message was delivered');
+                    clearTimeout(messageTimeoutRef.current);
+                    messageTimeoutRef.current = null;
+                  }
+                  
+                  // Replace the pending message with the confirmed one
+                  const updatedMessages = [...prevMessages];
+                  updatedMessages[pendingIndex] = {
+                    ...updatedMessages[pendingIndex],
+                    pending: false,
+                    error: false,
+                    id: data.id || updatedMessages[pendingIndex].id,
+                    timestamp: new Date(data.timestamp || data.createdAt || Date.now())
+                  };
+                  
+                  return updatedMessages;
+                } else {
+                  console.log(`No pending message found with refId: ${msgRefId}`);
+                }
+              } else {
+                console.log('Received message without a refId');
+              }
+              
+              // If no match by refId, check if this is a duplicate message
+              const isDuplicate = prevMessages.some(msg => 
+                !msg.pending && 
+                (msg.senderId === msgSenderId || msg.sender === msgSenderId) && 
+                msg.text === msgText &&
+                Math.abs(new Date(msg.timestamp) - new Date(data.timestamp || data.createdAt || Date.now())) < 1000
+              );
+              
+              // Only add if not a duplicate
+              if (!isDuplicate) {
+                console.log('Adding new message to state:', newMsg);
+                return [...prevMessages, newMsg];
+              } else {
+                console.log('Detected duplicate message, not adding to state');
+              }
+              
+              return prevMessages;
+            });
+            
+            // Mark as read since we're viewing the conversation
+            if (showChat && socketRef.current && socketRef.current.connected) {
+              console.log(`Marking message from ${msgSenderId} as read`);
+              socketRef.current.emit('mark-messages-read', { senderId: msgSenderId });
+            }
+            
+            // Scroll to bottom of messages
+            setTimeout(() => {
+              if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 100);
+          } else {
+            console.log(`Message not for current chat: from ${msgSenderId}, selected friend: ${selectedFriend ? (selectedFriend._id || selectedFriend.id) : 'none'}`);
+          }
+        } else {
+          console.warn('Received malformed message data:', data);
+        }
+      };
+      
+      // Handle message status updates
+      const handleMessageStatusUpdate = (data) => {
+        console.log('Message status updated:', data);
+        
+        // Handle authentication errors
+        if (data.error && data.error.includes('authenticated')) {
+          handleAuthError(data.error);
+          return;
+        }
+        
+        // Update message status in state
+        if (data.refId) {
+          setMessages(prevMessages => 
+            prevMessages.map(msg => 
+              (msg.refId === data.refId || msg.id === data.refId || msg.id === data.messageId)
+                ? {...msg, ...data, pending: false} 
+                : msg
+            )
+          );
+        }
+      };
+      
+      // Handle messages read confirmation
+      const handleMessagesRead = (data) => {
+        console.log('Messages read by:', data.by);
+      };
+      
+      // Add listeners
+      socketRef.current.on('authenticated', handleAuthenticated);
+      socketRef.current.on('authentication_error', handleAuthError);
+      socketRef.current.on('reconnect', handleReconnect);
+      socketRef.current.on('receive-direct-message', handleIncomingMessage);
+      socketRef.current.on('message-status-update', handleMessageStatusUpdate);
+      socketRef.current.on('messages-read', handleMessagesRead);
+      
+      // Cleanup function
+      return () => {
+        console.log('Cleaning up messaging event listeners');
+        if (socketRef.current) {
+          socketRef.current.off('authenticated', handleAuthenticated);
+          socketRef.current.off('authentication_error', handleAuthError);
+          socketRef.current.off('reconnect', handleReconnect);
+          socketRef.current.off('receive-direct-message', handleIncomingMessage);
+          socketRef.current.off('message-status-update', handleMessageStatusUpdate);
+          socketRef.current.off('messages-read', handleMessagesRead);
+        }
+      };
+    }
+  }, [socketRef.current, selectedFriend, showChat, userId]);
+  
+  // Make sure we have the userId
+  useEffect(() => {
+    // Get userId from localStorage
+    const storedUserId = localStorage.getItem('userId');
+    
+    if (storedUserId) {
+      setUserId(storedUserId);
+      console.log('Using stored userId:', storedUserId);
+    } else {
+      // If no userId in localStorage, try to fetch from API
+      const fetchUserId = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) return;
+          
+          const response = await axios.get(`${API_BASE_URL}/api/users/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          
+          if (response.data && response.data._id) {
+            console.log('Fetched userId from API:', response.data._id);
+            setUserId(response.data._id);
+            localStorage.setItem('userId', response.data._id);
+          }
+        } catch (err) {
+          console.error('Error fetching user data:', err);
+        }
+      };
+      
+      fetchUserId();
+    }
+  }, []);
+  
+  // Add socket connection handlers for more reliable operation
+  useEffect(() => {
+    // Skip if no socket
+    if (!socketRef.current) return;
+    
+    const token = localStorage.getItem('token');
+    const storedUserId = localStorage.getItem('userId');
+    
+    // Auto re-authenticate every 5 minutes to keep session alive
+    const reauthInterval = setInterval(() => {
+      console.log('Performing periodic re-authentication');
+      if (socketRef.current && socketRef.current.connected && token) {
+        socketRef.current.emit('authenticate', { token, userId: storedUserId });
+      }
+    }, 300000); // 5 minutes
+    
+    // Listen for connection issues
+    const handleConnect = () => {
+      console.log('Socket reconnected, re-authenticating');
+      if (token) {
+        socketRef.current.emit('authenticate', { token, userId: storedUserId });
+      }
+    };
+    
+    const handleDisconnect = (reason) => {
+      console.log('Socket disconnected, reason:', reason);
+      if (reason === 'io server disconnect') {
+        // Server disconnected us, try to reconnect
+        setTimeout(() => {
+          if (socketRef.current) {
+            socketRef.current.connect();
+          }
+        }, 1000);
+      }
+    };
+    
+    // Add connection event listeners
+    socketRef.current.on('connect', handleConnect);
+    socketRef.current.on('disconnect', handleDisconnect);
+    
+    // Clean up on unmount
+    return () => {
+      clearInterval(reauthInterval);
+      if (socketRef.current) {
+        socketRef.current.off('connect', handleConnect);
+        socketRef.current.off('disconnect', handleDisconnect);
+      }
+    };
+  }, [socketRef.current]);
+  
   return (
     <div className="flex flex-col h-screen bg-[#14141B] text-white">
       {/* Header */}
@@ -1066,6 +1706,17 @@ const EditorPage = () => {
               />
             )}
           </div>
+          
+          {/* Chat button */}
+          <div>
+            <button
+              onClick={() => setShowChat(!showChat)}
+              className="bg-[#1E1E29] hover:bg-[#2A2A3A] p-2 rounded-full transition-colors relative"
+              title="Chat"
+            >
+              <MessageSquare size={20} className={showChat ? "text-[#4D5DFE]" : "text-gray-300"} />
+            </button>
+          </div>
         </div>
       </header>
       
@@ -1113,6 +1764,17 @@ const EditorPage = () => {
               <X className="h-4 w-4 mr-2" />
               Close Room
                   </button>
+                  
+            <button
+              onClick={() => {
+                setShowChat(!showChat);
+                setShowMobileHeaderMenu(false);
+              }}
+              className="w-full bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors"
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              {showChat ? 'Close Chat' : 'Open Chat'}
+            </button>
                 </div>
               </div>
             )}
@@ -1124,6 +1786,200 @@ const EditorPage = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4D5DFE]"></div>
             <p className="mt-4 text-white">Loading project...</p>
           </div>
+        </div>
+      )}
+      
+      {/* Chat sidebar */}
+      {showChat && (
+        <div className="fixed top-16 right-0 bottom-0 w-72 border-l border-[#2A2A3A] bg-[#14141B]/80 backdrop-blur-sm flex flex-col z-40 transition-all duration-300 ease-in-out">
+          {selectedFriend ? (
+            // Chat with selected friend
+            <>
+              {/* Chat header */}
+              <div className="p-4 border-b border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm flex items-center">
+                <button 
+                  className="mr-3 text-[#8F8FA3] hover:text-white"
+                  onClick={() => setSelectedFriend(null)}
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                  <img 
+                    src={selectedFriend.profilePic || selectedFriend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`)} 
+                    alt={selectedFriend.userName || selectedFriend.name || 'User'} 
+                    className="w-9 h-9 rounded-full object-cover relative z-10"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`;
+                    }}
+                  />
+                </div>
+                <div className="ml-3 flex-1 truncate">
+                  <h3 className="font-semibold truncate">{selectedFriend.userName || selectedFriend.name || 'Unknown User'}</h3>
+                  <p className="text-xs text-[#8F8FA3]">
+                    {selectedFriend.status || 'Online'}
+                  </p>
+                </div>
+                <button 
+                  className="text-[#8F8FA3] hover:text-white"
+                  onClick={() => setShowChat(false)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Messages area */}
+              <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B]">
+                {messagesLoading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-[#8F8FA3]">
+                    <MessageSquare size={32} className="mb-2 opacity-20" />
+                    <p className="text-sm">No messages yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {messages.map((message, index) => {
+                      const isMyMessage = message.senderId === userId;
+                      return (
+                        <div 
+                          key={message.id || index}
+                          className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[90%] rounded-2xl p-2 ${
+                              isMyMessage 
+                                ? 'bg-[#4D5DFE]/90 text-white rounded-tr-none' 
+                                : 'bg-[#1E1E29]/80 backdrop-blur-sm text-white rounded-tl-none'
+                            } ${message.pending ? 'opacity-70' : ''}`}
+                          >
+                            <p className="text-sm">{message.text}</p>
+                            <p className="text-xs text-right opacity-70">
+                              {(() => {
+                                try {
+                                  const dateObj = typeof message.timestamp === 'object' 
+                                    ? message.timestamp 
+                                    : new Date(message.timestamp || message.createdAt);
+                                  
+                                  // Add explicit check for invalid date
+                                  if (!dateObj || isNaN(dateObj.getTime())) {
+                                    return 'Just now';
+                                  }
+                                  
+                                  return dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                } catch (e) {
+                                  console.error('Error parsing message timestamp:', e);
+                                  return 'Just now';
+                                }
+                              })()}
+                              {message.pending && ' • Sending...'}
+                              {message.error && ' • Failed to send'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
+              </div>
+
+              {/* Message input */}
+              <div className="p-3 border-t border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm">
+                <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4D5DFE] backdrop-blur-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newMessage.trim()}
+                    className="p-2 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send size={16} />
+                  </button>
+                </form>
+              </div>
+            </>
+          ) : (
+            // Friends list
+            <>
+              <div className="p-4 border-b border-[#2A2A3A] flex justify-between items-center">
+                <h2 className="font-semibold">Friends</h2>
+                <button 
+                  onClick={() => setShowChat(false)}
+                  className="p-1.5 bg-[#1E1E29]/60 hover:bg-[#1E1E29] rounded-md transition-colors"
+                  title="Close"
+                >
+                  <X size={16} className="text-[#8F8FA3]" />
+                </button>
+              </div>
+              
+              <div className="p-3">
+                <div className="relative mb-3">
+                  <input
+                    type="text"
+                    placeholder="Search friends..."
+                    value={friendSearchTerm}
+                    onChange={(e) => setFriendSearchTerm(e.target.value)}
+                    className="w-full bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 pl-8 text-sm focus:outline-none focus:border-[#4D5DFE]"
+                  />
+                  <Search className="absolute left-2.5 top-2.5 text-[#8F8FA3]" size={14} />
+                </div>
+                
+                {messagesLoading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                  </div>
+                ) : friends.length === 0 ? (
+                  <div className="text-center p-4 bg-[#14141B]/60 rounded-lg border border-[#2A2A3A]">
+                    <Users className="mx-auto mb-3 text-[#8F8FA3]" size={24} />
+                    <h3 className="text-sm font-semibold mb-1">No friends yet</h3>
+                    <p className="text-xs text-[#8F8FA3] mb-3">Connect with other users to chat</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 overflow-y-auto custom-scrollbar max-h-[calc(100vh-180px)]">
+                    {friends
+                      .filter(friend => 
+                        (friend.userName?.toLowerCase() || friend.name?.toLowerCase() || '').includes(friendSearchTerm.toLowerCase())
+                      )
+                      .map(friend => (
+                        <div 
+                          key={friend._id || friend.id} 
+                          className="flex items-center p-2 hover:bg-[#1E1E29]/60 rounded-md cursor-pointer transition-colors"
+                          onClick={() => handleSelectFriend(friend)}
+                        >
+                          <div className="relative">
+                            <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                            <img 
+                              src={friend.profilePic || friend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`)} 
+                              alt={friend.userName || friend.name || 'User'} 
+                              className="w-9 h-9 rounded-full object-cover relative z-10"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`;
+                              }}
+                            />
+                          </div>
+                          <div className="ml-2 truncate">
+                            <h4 className="font-medium text-sm truncate">{friend.userName || friend.name || 'Unknown User'}</h4>
+                            <p className="text-xs text-[#8F8FA3] truncate">
+                              {friend.status || 'Online'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
       
