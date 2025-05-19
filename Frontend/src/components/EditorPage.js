@@ -12,7 +12,7 @@ import { css } from '@codemirror/lang-css';
 import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import { githubDark } from '@uiw/codemirror-theme-github';
-import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle } from 'lucide-react';
+import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle, FileText, Terminal, Code, Menu, Play } from 'lucide-react';
 import axios from 'axios';
 
 import FileExplorer from './FileExplorer';
@@ -34,6 +34,30 @@ const EditorPage = () => {
   const [showExplorer, setShowExplorer] = useState(true);
   const [showSnippets, setShowSnippets] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [runCode, setRunCode] = useState(false);
+  
+  // State for mobile responsive tabbed interface
+  const [activeTab, setActiveTab] = useState('editor'); // 'editor', 'files', 'terminal', 'snippets'
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Function to check if we're on mobile
+  const isMobile = () => window.innerWidth < 768;
+
+  // Add resize listener to update view on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (!isMobile()) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial check
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
   
   // Add state for project save modal
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -236,6 +260,11 @@ const EditorPage = () => {
           sender: socketRef.current.id
         });
       }
+      
+      // Switch to editor tab on mobile after selecting a file
+      if (isMobile()) {
+        setActiveTab('editor');
+      }
     }
   }, [selectedFile, roomId]);
   
@@ -255,59 +284,59 @@ const EditorPage = () => {
     return langMap[language] || javascript();
   };
   
-  // Handle code changes - with debouncing to avoid excessive updates
+  // Handle code changes and notify other users
   const handleCodeChange = (value) => {
-    // Don't process if this change was triggered by a remote update
+    // Don't process remote changes coming back to us
     if (codeChangeRef.current) {
-      console.log('Skipping local handling of remote update');
       return;
     }
     
-    // Update local state immediately
+    // Update the local code state first for immediate feedback
     setCode(value);
     
-    // Cancel previous debounce timer
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
     
-    // Debounce the emission of updates to reduce network traffic
+    // Debounce to prevent too many updates
     debounceTimeoutRef.current = setTimeout(() => {
-      // Only send updates if connected
+      // Only sync if we're connected and have a room
       if (socketRef.current && socketRef.current.connected && roomId) {
-        console.log('Sending code update to server');
-        
-        // Use both event names for compatibility
         const updateData = {
           roomId,
           code: value,
-          content: value, // Include for compatibility with both event names
+          content: value,
           sender: socketRef.current.id,
-          fileId: selectedFile?._id,
-          timestamp: Date.now() // Add timestamp for ordering
+          fileId: selectedFile?._id || null,
+          timestamp: Date.now()
         };
         
-        // Emit using both code-update and code-change events for maximum compatibility
         socketRef.current.emit('code-update', updateData);
         socketRef.current.emit('code-change', updateData);
         
-        // Update file content in the backend
+        console.log('Sent code update:', {
+          roomId,
+          codeLength: value.length,
+          fileId: selectedFile?._id || null
+        });
+        
+        // Update file content in the backend if we have a selected file
         if (selectedFile) {
           updateFileContent(selectedFile._id, value);
         }
       } else {
-        console.warn('Cannot send update - socket disconnected or no room ID');
+        console.log('Not syncing code change - not connected or no room selected');
       }
-    }, 300); // Slightly faster debounce (300ms) for more responsive updates
+    }, 500);
   };
   
-  // Update file content in the backend
+  // Helper to update file content in the backend
   const updateFileContent = async (fileId, content) => {
     if (!fileId) return;
     
     try {
       const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -315,14 +344,14 @@ const EditorPage = () => {
       });
       
       if (!response.ok) {
-        console.error('Failed to update file content');
+        console.error('Failed to update file content:', await response.text());
       }
     } catch (err) {
       console.error('Error updating file content:', err);
     }
   };
   
-  // Handle file selection
+  // Handle file selection from the file explorer
   const handleFileSelect = (file) => {
     setSelectedFile(file);
   };
@@ -330,105 +359,50 @@ const EditorPage = () => {
   // Copy room ID to clipboard
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId);
-    alert('Room ID copied to clipboard!');
+    alert(`Room ID ${roomId} copied to clipboard!`);
   };
   
-  // Handle connection status change
+  // Force reconnection to the server
   const reconnect = () => {
-    if (!isConnected && socketRef.current) {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
       socketRef.current.connect();
     }
+    alert('Attempting to reconnect to server...');
   };
   
-  // Request current room users
+  // Request an updated list of users in the room
   const requestRoomUsers = () => {
-    if (socketRef.current && socketRef.current.connected && roomId) {
-      console.log('Requesting room users manually...');
+    if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('get-room-users', { roomId });
+      console.log('Requested updated room users list');
+    } else {
+      alert('Not connected to server. Cannot request users list.');
     }
   };
   
-  // Request room users on initial connection and periodically
-  useEffect(() => {
-    if (isConnected && roomId) {
-      // Request room users initially
-      requestRoomUsers();
-      
-      // Set up interval to periodically refresh the user list
-      const interval = setInterval(requestRoomUsers, 10000); // Every 10 seconds
-      
-      return () => clearInterval(interval);
-    }
-  }, [isConnected, roomId]);
-  
-  // Close room
+  // Close the room and navigate back to main page
   const closeRoom = async () => {
-    // If user is authenticated, check if they're the host
-    const token = localStorage.getItem('token');
-    const isUserLoggedIn = !!token;
-    
-    console.log('Closing room:', roomId);
-    console.log('Current username:', username);
-    console.log('Username from localStorage:', localStorage.getItem('userName'));
-    console.log('Is user logged in:', isUserLoggedIn);
-    
-    if (isUserLoggedIn) {
-      try {
-        // Check if the current user is the host
-        const roomResponse = await axios.get(`${API_BASE_URL}/api/rooms/${roomId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-          withCredentials: true
-        });
-        
-        console.log('Room data:', roomResponse.data);
-        
-        // Fix: Make a more robust check for the creator
-        if (roomResponse.data && roomResponse.data.room) {
-          const room = roomResponse.data.room;
-          console.log('Room creator:', room.createdBy);
-          console.log('Current user:', username);
-          
-          // Check if the current user is the creator - store userName in localStorage for consistency
-          localStorage.setItem('userName', username);
-          
-          const isCreator = room.createdBy === username;
-          console.log('Is creator:', isCreator);
-          
-          if (isCreator) {
-            // Show the save modal instead of confirm dialog
-            setProjectName(`Project-${roomId}`);
-            setProjectDescription(`Project created from room ${roomId}`);
-            setShowSaveModal(true);
-            return; // Don't proceed with room closing yet
-          } else {
-            console.log('User is not the creator of this room according to comparison');
-            console.log(`Creator: "${room.createdBy}" (${typeof room.createdBy}), Current user: "${username}" (${typeof username})`);
-            // Attempt to save anyway if username seems to be a close match (case difference, etc.)
-            if (room.createdBy.toLowerCase() === username.toLowerCase()) {
-              console.log('Username matches ignoring case, proceeding with save');
-              setProjectName(`Project-${roomId}`);
-              setProjectDescription(`Project created from room ${roomId}`);
-              setShowSaveModal(true);
-              return;
-            }
-          }
-        } else {
-          console.error('Room data not found in response:', roomResponse.data);
+    try {
+      // First show the save project modal if user is authenticated
+      const token = localStorage.getItem('token');
+      if (token) {
+        const userConfirmedSave = window.confirm('Do you want to save this project before closing?');
+        if (userConfirmedSave) {
+          setShowSaveModal(true);
+          return;
         }
-      } catch (error) {
-        console.error('Error checking if user is host:', error);
-        console.error('Response data:', error.response?.data);
       }
+      
+      await finishRoomClose();
+    } catch (error) {
+      console.error('Error closing room:', error);
+      alert('Failed to close room properly. Navigating back anyway.');
+      navigate('/');
     }
-    
-    // If we get here, either user is not logged in, not the host, or there was an error
-    // Just close the room without saving
-    finishRoomClose();
   };
   
-  // Handle saving the project and then closing the room
+  // Handle save project
   const handleSaveProject = async () => {
     if (!projectName.trim()) {
       alert('Please enter a project name');
@@ -439,22 +413,25 @@ const EditorPage = () => {
     
     try {
       const token = localStorage.getItem('token');
-      console.log('Saving project with name:', projectName);
-      
-      // Make sure we're using consistent username
-      const savedUsername = localStorage.getItem('userName');
-      
-      // Check if we have originalProjectId in state (if this was loaded from a project)
-      const originalProjectId = location.state?.originalProjectId;
-      if (originalProjectId) {
-        console.log('This room was loaded from project:', originalProjectId);
+      if (!token) {
+        throw new Error('Not authenticated');
       }
       
-      const saveResponse = await axios.post(`${API_BASE_URL}/api/projects/save/${roomId}`, {
+      // Get all files in the room
+      const filesResponse = await fetch(`${API_BASE_URL}/api/files/room/${roomId}`);
+      if (!filesResponse.ok) {
+        throw new Error('Failed to fetch files');
+      }
+      
+      const filesData = await filesResponse.json();
+      const files = filesData.files || [];
+      
+      // Save the project
+      const response = await axios.post(`${API_BASE_URL}/api/projects`, {
         name: projectName,
-        description: projectDescription || `Project created from room ${roomId}`,
-        createdBy: savedUsername, // Add createdBy explicitly to ensure it matches
-        originalProjectId // Pass the original project ID if it exists
+        description: projectDescription,
+        roomId,
+        files
       }, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -462,41 +439,43 @@ const EditorPage = () => {
         withCredentials: true
       });
       
-      console.log('Project save response:', saveResponse.data);
-      const isNewProject = saveResponse.data.isNewProject;
-      alert(isNewProject ? 'Project saved successfully!' : 'Project updated successfully!');
+      alert('Project saved successfully!');
       
-      // Close the modal and finish closing the room
-      setShowSaveModal(false);
-      finishRoomClose();
-    } catch (saveError) {
-      console.error('Error saving project:', saveError);
-      console.error('Response data:', saveError.response?.data);
-      alert(`Failed to save project: ${saveError.response?.data?.message || saveError.message}`);
+      // Now close the room
+      await finishRoomClose();
+    } catch (error) {
+      console.error('Error saving project:', error);
+      alert('Failed to save project: ' + (error.response?.data?.error || error.message));
       setIsSaving(false);
     }
   };
   
-  // Cancel saving and just close the room
+  // Cancel project save
   const cancelSaveProject = () => {
     setShowSaveModal(false);
-    finishRoomClose();
+    setProjectName('');
+    setProjectDescription('');
   };
   
-  // Finish closing the room (after save or cancel)
+  // Finish closing the room after deciding on save
   const finishRoomClose = async () => {
-    const token = localStorage.getItem('token');
-    
-    // First try to close room in the backend
     try {
+      // Check if there is a backend API to close the room
+      const token = localStorage.getItem('token');
       if (token) {
-        await axios.post(`${API_BASE_URL}/api/rooms/${roomId}/close`, {}, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-          withCredentials: true
-        });
-        console.log('Room closed in the backend successfully');
+        try {
+          const response = await axios.post(`${API_BASE_URL}/api/rooms/${roomId}/close`, {}, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            withCredentials: true
+          });
+          
+          console.log('Room closed successfully:', response.data);
+        } catch (apiError) {
+          console.warn('API error when closing room:', apiError);
+          // Continue with closing even if the API call fails
+        }
       }
     } catch (error) {
       console.error('Error closing room in backend:', error);
@@ -540,11 +519,109 @@ const EditorPage = () => {
     };
   }, [roomId]);
   
+  // Render the active tab content for mobile view
+  const renderMobileTabContent = () => {
+    switch (activeTab) {
+      case 'files':
+        return (
+          <div className="h-full overflow-y-auto">
+            <FileExplorer 
+              roomId={roomId}
+              onFileSelect={handleFileSelect}
+              selectedFile={selectedFile}
+            />
+          </div>
+        );
+      case 'terminal':
+        return <CodeTerminal code={code} language={language} autoRun={runCode} onRunComplete={() => setRunCode(false)} />;
+      case 'snippets':
+        return (
+          <CodeSnippetLibrary onSnippetSelect={(snippet) => {
+            const newCode = code + '\n\n' + snippet.code;
+            setCode(newCode);
+            
+            // Broadcast the code update to other users
+            if (socketRef.current && socketRef.current.connected && roomId) {
+              const updateData = {
+                roomId,
+                code: newCode,
+                content: newCode,
+                sender: socketRef.current.id,
+                fileId: selectedFile?._id,
+                timestamp: Date.now()
+              };
+              
+              socketRef.current.emit('code-update', updateData);
+              socketRef.current.emit('code-change', updateData);
+              
+              console.log('Sent code update with snippet');
+              
+              // Update file content in the backend
+              if (selectedFile) {
+                updateFileContent(selectedFile._id, newCode);
+              }
+            }
+            
+            // Switch back to editor after inserting snippet
+            setActiveTab('editor');
+          }} />
+        );
+      default: // 'editor'
+        return (
+          <div className="relative h-full">
+            <CodeMirror
+              value={code}
+              height="100%"
+              theme={githubDark}
+              extensions={[getLanguageExtension()]}
+              onChange={handleCodeChange}
+              basicSetup={{
+                lineNumbers: true,
+                highlightActiveLineGutter: true,
+                highlightSpecialChars: true,
+                history: true,
+                foldGutter: true,
+                drawSelection: true,
+                dropCursor: true,
+                allowMultipleSelections: true,
+                indentOnInput: true,
+                syntaxHighlighting: true,
+                bracketMatching: true,
+                closeBrackets: true,
+                autocompletion: true,
+                rectangularSelection: true,
+                crosshairCursor: true,
+                highlightActiveLine: true,
+                highlightSelectionMatches: true,
+                closeBracketsKeymap: true,
+                defaultKeymap: true,
+                searchKeymap: true,
+                historyKeymap: true,
+                foldKeymap: true,
+                completionKeymap: true,
+                lintKeymap: true,
+              }}
+            />
+            {/* Sticky Run Code Button - modified to execute code */}
+            <button
+              onClick={() => {
+                setActiveTab('terminal');
+                setRunCode(true);
+              }}
+              className="absolute bottom-6 right-6 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-full p-3 shadow-lg flex items-center justify-center"
+            >
+              <Play size={24} fill="white" />
+            </button>
+          </div>
+        );
+    }
+  };
+  
   return (
     <div className="flex flex-col h-screen bg-[#0F0F13] text-white">
       {/* Project Save Modal */}
       {showSaveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#14141B] border border-[#2A2A3A] rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Save Project</h2>
             <p className="text-[#8F8FA3] mb-6">Save your project to access it later from your dashboard.</p>
@@ -592,25 +669,86 @@ const EditorPage = () => {
         </div>
       )}
       
+      {/* Mobile Dropdown Menu */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 md:hidden">
+          <div className="bg-[#14141B] w-full p-4 border-b border-[#2A2A3A]">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Room Options</h2>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="p-1">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  copyRoomId();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] p-3 rounded-md flex items-center"
+              >
+                <Share2 className="h-5 w-5 mr-3" />
+                <span>Share Room</span>
+              </button>
+              <button
+                onClick={() => {
+                  requestRoomUsers();
+                  setShowUsers(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full bg-[#1E1E29] hover:bg-[#2A2A3A] p-3 rounded-md flex items-center"
+              >
+                <Users className="h-5 w-5 mr-3" />
+                <span>View Users ({currentUsers.length})</span>
+              </button>
+              <button
+                onClick={() => {
+                  closeRoom();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full bg-[#E94560]/10 hover:bg-[#E94560]/20 text-[#E94560] p-3 rounded-md flex items-center"
+              >
+                <X className="h-5 w-5 mr-3" />
+                <span>Close Room</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Header with room info and users */}
       <header className="bg-[#14141B] border-b border-[#2A2A3A] p-3">
         <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-bold">Room: {roomId}</h1>
-            <button
-              onClick={copyRoomId}
-              className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+          <div className="flex items-center space-x-2 md:space-x-4">
+            {/* Mobile menu button */}
+            <button 
+              className="mr-2 p-1 md:hidden"
+              onClick={() => setIsMobileMenuOpen(true)}
             >
-              <Share2 className="h-4 w-4 mr-1" />
-              Share
+              <Menu size={20} />
             </button>
-            <button
-              onClick={closeRoom}
-              className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Close
-            </button>
+            
+            <h1 className="text-lg md:text-xl font-bold truncate max-w-[150px] md:max-w-none">
+              {roomId}
+            </h1>
+            
+            {/* Desktop buttons */}
+            <div className="hidden md:flex items-center space-x-2">
+              <button
+                onClick={copyRoomId}
+                className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </button>
+              <button
+                onClick={closeRoom}
+                className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Close
+              </button>
+            </div>
           </div>
           
           <div className="relative">
@@ -618,18 +756,14 @@ const EditorPage = () => {
               onClick={() => {
                 setShowUsers(!showUsers);
                 if (!showUsers) {
-                  requestRoomUsers(); // Refresh users when opening the panel
+                  requestRoomUsers();
                 }
               }}
-              className="bg-[#1E1E29] hover:bg-[#2A2A3A] px-3 py-1 rounded-md flex items-center transition-colors"
+              className="bg-[#1E1E29] hover:bg-[#2A2A3A] px-2 py-1 md:px-3 rounded-md flex items-center transition-colors"
             >
-              <Users className="h-4 w-4 mr-2" />
-              <span>{currentUsers.length} {currentUsers.length === 1 ? 'User' : 'Users'}</span>
-              {showUsers ? (
-                <ChevronUp className="h-4 w-4 ml-2" />
-              ) : (
-                <ChevronDown className="h-4 w-4 ml-2" />
-              )}
+              <Users className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">{currentUsers.length} {currentUsers.length === 1 ? 'User' : 'Users'}</span>
+              <span className="md:hidden">{currentUsers.length}</span>
             </button>
             
             {showUsers && (
@@ -637,7 +771,12 @@ const EditorPage = () => {
                 <div className="p-2 border-b border-[#2A2A3A] flex justify-between items-center">
                   <h3 className="text-sm font-medium">Users in this room</h3>
                   <button 
-                    onClick={requestRoomUsers}
+                    onClick={() => {
+                      requestRoomUsers();
+                      if (isMobile()) {
+                        setShowUsers(false);
+                      }
+                    }}
                     className="text-xs text-[#4D5DFE] hover:text-[#3A4AE1]"
                     title="Refresh users list"
                   >
@@ -663,7 +802,8 @@ const EditorPage = () => {
         </div>
       </header>
       
-      <div className="flex flex-1 overflow-hidden">
+      {/* Desktop Layout */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
         {/* File Explorer */}
         {showExplorer && (
           <div className="w-64 border-r border-[#2A2A3A] flex-shrink-0 overflow-y-auto bg-[#14141B]">
@@ -715,7 +855,7 @@ const EditorPage = () => {
           
           {/* Terminal */}
           {showTerminal && (
-            <CodeTerminal code={code} language={language} />
+            <CodeTerminal code={code} language={language} autoRun={runCode} onRunComplete={() => setRunCode(false)} />
           )}
         </div>
         
@@ -752,8 +892,44 @@ const EditorPage = () => {
         )}
       </div>
       
-      {/* Bottom Action Bar */}
-      <div className="bg-[#14141B] border-t border-[#2A2A3A] p-2 flex justify-between">
+      {/* Mobile Layout with Tabs */}
+      <div className="md:hidden flex flex-col flex-1 overflow-hidden">
+        {/* Mobile file name indicator */}
+        {selectedFile && (
+          <div className="bg-[#1E1E29] px-4 py-2 text-sm truncate border-b border-[#2A2A3A]">
+            <div className="flex items-center">
+              <FileText size={14} className="mr-2 text-[#4D5DFE]" />
+              <span className="truncate">{selectedFile.name}</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Mobile Tab Content */}
+        <div className="flex-1 overflow-hidden">
+          {renderMobileTabContent()}
+        </div>
+        
+        {/* Mobile Tab Navigation */}
+        <div className="bg-[#14141B] border-t border-[#2A2A3A] grid grid-cols-2 divide-x divide-[#2A2A3A]">
+          <button 
+            onClick={() => setActiveTab('files')} 
+            className={`flex flex-col items-center justify-center py-3 ${activeTab === 'files' ? 'text-[#4D5DFE]' : 'text-[#8F8FA3]'}`}
+          >
+            <FileText size={20} className="mb-1" />
+            <span className="text-xs">Files</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('editor')} 
+            className={`flex flex-col items-center justify-center py-3 ${activeTab === 'editor' ? 'text-[#4D5DFE]' : 'text-[#8F8FA3]'}`}
+          >
+            <Code size={20} className="mb-1" />
+            <span className="text-xs">Editor</span>
+          </button>
+        </div>
+      </div>
+      
+      {/* Desktop Bottom Action Bar */}
+      <div className="hidden md:flex bg-[#14141B] border-t border-[#2A2A3A] p-2 justify-between">
         <div className="flex space-x-2">
           <button
             onClick={() => setShowExplorer(!showExplorer)}
@@ -762,18 +938,22 @@ const EditorPage = () => {
             File Explorer
           </button>
           <button
-            onClick={() => setShowTerminal(!showTerminal)}
-            className={`px-3 py-1 rounded text-sm transition-colors ${showTerminal ? 'bg-[#4D5DFE] hover:bg-[#3A4AE1]' : 'bg-[#1E1E29] hover:bg-[#2A2A3A]'}`}
-          >
-            Terminal
-          </button>
-          <button
             onClick={() => setShowSnippets(!showSnippets)}
             className={`px-3 py-1 rounded text-sm transition-colors ${showSnippets ? 'bg-[#4D5DFE] hover:bg-[#3A4AE1]' : 'bg-[#1E1E29] hover:bg-[#2A2A3A]'}`}
           >
             Code Snippets
           </button>
         </div>
+        <button
+          onClick={() => {
+            setShowTerminal(true);
+            setRunCode(true);
+          }}
+          className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-3 py-1 rounded-md text-sm flex items-center transition-colors"
+        >
+          <Play size={16} className="mr-1" fill="white" />
+          Run Code
+        </button>
       </div>
     </div>
   );

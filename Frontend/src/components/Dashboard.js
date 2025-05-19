@@ -75,7 +75,7 @@ function Dashboard() {
 
   // Add state for mobile sidebar visibility
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  
+
   // Create a ref to store the current message timeout
   const messageTimeoutRef = useRef(null);
 
@@ -1272,9 +1272,9 @@ function Dashboard() {
           <div className="flex items-center space-x-2">
             <div className="relative">
               <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-md"></div>
-              <img
-                src={userProfile?.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${userName}&background=4D5DFE&color=fff`)}
-                alt={userName}
+              <img 
+                src={userProfile?.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${userName}&background=4D5DFE&color=fff`)} 
+                  alt={userName}
                 className="w-8 h-8 rounded-full object-cover relative z-10"
               />
             </div>
@@ -1283,7 +1283,7 @@ function Dashboard() {
             </button>
           </div>
         </div>
-      </div>
+        </div>
 
       {/* Left Sidebar */}
       {showLeftSidebar && (
@@ -1292,22 +1292,22 @@ function Dashboard() {
           <div className="fixed top-16 left-0 h-full w-64 bg-[#14141B] border-r border-[#2A2A3A] z-50 shadow-lg overflow-hidden">
             <div className="p-4 border-b border-[#2A2A3A] flex justify-between items-center">
               <h2 className="font-medium">Menu</h2>
-              <button 
+            <button 
                 onClick={() => setShowLeftSidebar(false)}
                 className="text-[#8F8FA3] hover:text-white p-1 rounded"
-              >
+          >
                 <X size={18} />
-              </button>
+            </button>
             </div>
             <div className="p-3">
-              <button
+            <button 
                 onClick={() => handleNavigation('projects')}
                 className="w-full flex items-center p-3 mb-2 rounded-md transition-colors hover:bg-[#1E1E29]/60"
-              >
+          >
                 <FolderOpen size={18} className="mr-3" />
                 <span>Projects</span>
-              </button>
-              <button
+            </button>
+            <button 
                 onClick={() => handleNavigation('tasks')}
                 className="w-full flex items-center p-3 rounded-md transition-colors hover:bg-[#1E1E29]/60"
               >
@@ -1344,11 +1344,11 @@ function Dashboard() {
               >
                 <List size={16} className="mr-2" />
                 View Tasks
-              </button>
+            </button>
             </div>
           </div>
-        </div>
-
+          </div>
+          
         {/* Right Sidebar - Friends list that transforms to chat */}
         <div className="w-72 border-l border-[#2A2A3A] bg-[#14141B]/80 backdrop-blur-sm flex flex-col">
           {rightSidebarContent === 'chat' && selectedFriend ? (
@@ -1362,7 +1362,7 @@ function Dashboard() {
                 >
                   <ChevronLeft size={20} />
                 </button>
-                <div className="relative">
+                        <div className="relative">
                   <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
                   <img 
                     src={selectedFriend.profilePic || selectedFriend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`)} 
@@ -1375,9 +1375,9 @@ function Dashboard() {
                   <p className="text-xs text-[#8F8FA3]">
                     {selectedFriend.status || 'Online'}
                   </p>
+          </div>
                 </div>
-              </div>
-
+                
               {/* Messages area */}
               <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B]">
                 {loading ? (
@@ -1393,8 +1393,8 @@ function Dashboard() {
                   <div className="space-y-3">
                     {messages.map((message, index) => {
                       const isMyMessage = message.senderId === userId;
-                      return (
-                        <div 
+                        return (
+                          <div 
                           key={message.id || index}
                           className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
                         >
@@ -1413,11 +1413,11 @@ function Dashboard() {
                               }
                               {message.pending && ' • Sending...'}
                               {message.error && ' • Failed to send'}
-                            </p>
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                     <div ref={messagesEndRef} />
                   </div>
                 )}
@@ -1564,32 +1564,32 @@ function Dashboard() {
               <div className="p-3 border-b border-[#2A2A3A] bg-[#14141B]/90 flex justify-between items-center">
                 <h3 className="font-medium">Messages</h3>
                 <div className="relative">
-                  <input
-                    type="text"
+              <input
+                type="text"
                     placeholder="Search friends..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-32 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md py-1 pl-7 pr-2 text-xs focus:outline-none focus:border-[#4D5DFE]"
                   />
                   <Search className="absolute left-2 top-1.5 text-[#8F8FA3]" size={12} />
-                </div>
-              </div>
+            </div>
+            </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {loading ? (
                   <div className="flex justify-center items-center h-32">
                     <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
-                  </div>
+          </div>
                 ) : friends.length === 0 ? (
                   <div className="text-center p-6 text-[#8F8FA3]">
                     <Users className="mx-auto mb-2 opacity-20" size={24} />
                     <p className="text-sm">No friends yet</p>
-                    <button 
+                <button 
                       onClick={() => setRightSidebarContent('users')} 
                       className="mt-2 text-[#4D5DFE] text-xs flex items-center mx-auto"
-                    >
+                >
                       <UserPlus size={12} className="mr-1" />
                       Add Friends
-                    </button>
+                </button>
                   </div>
                 ) : (
                   <div>
@@ -1603,27 +1603,27 @@ function Dashboard() {
                           className="flex items-center p-3 hover:bg-[#1E1E29]/60 cursor-pointer transition-colors"
                           onClick={() => handleSelectFriend(friend)}
                         >
-                          <div className="relative">
-                            <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                            <img 
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                  <img 
                               src={friend.profilePic || friend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`)}
                               alt={friend.userName || friend.name || 'User'} 
-                              className="w-10 h-10 rounded-full object-cover relative z-10"
-                            />
-                          </div>
+                    className="w-10 h-10 rounded-full object-cover relative z-10"
+                  />
+                </div>
                           <div className="ml-3 truncate">
                             <h4 className="font-medium truncate">{friend.userName || friend.name || 'Unknown User'}</h4>
                             <p className="text-xs text-[#8F8FA3] truncate">
                               {friend.status || 'Online'}
-                            </p>
-                          </div>
-                        </div>
+                  </p>
+                </div>
+      </div>
                       ))}
                   </div>
                 )}
-              </div>
+            </div>
             </>
-          )}
+        )}
         </div>
       </div>
     </div>

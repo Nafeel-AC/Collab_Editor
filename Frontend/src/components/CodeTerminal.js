@@ -49,7 +49,7 @@ const terminalDarkModeStyle = `
   }
 `;
 
-const CodeTerminal = ({ code, language }) => {
+const CodeTerminal = ({ code, language, autoRun = false, onRunComplete }) => {
   const [output, setOutput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
@@ -104,6 +104,17 @@ const CodeTerminal = ({ code, language }) => {
       }
     }
   }, [output, waitingForInput, executionId, inputsProvided, expectedInputs]);
+
+  // Add useEffect to execute code when autoRun is true
+  useEffect(() => {
+    if (autoRun && code) {
+      executeCode();
+      // Notify parent that execution has started
+      if (onRunComplete) {
+        onRunComplete();
+      }
+    }
+  }, [autoRun, code]);
 
   // Estimate number of input calls in the code
   const estimateInputCount = (code, language) => {
