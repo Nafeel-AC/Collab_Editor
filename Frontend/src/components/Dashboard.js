@@ -2597,7 +2597,340 @@ function Dashboard() {
         {/* Right Sidebar - Only render for desktop view or when explicitly needed for mobile */}
         {(rightSidebarContent && (!isMobileView || (isMobileView && mainContent === null))) && (
           <div className="w-72 border-l border-[#2A2A3A] bg-[#14141B]/80 backdrop-blur-sm flex flex-col fixed top-16 right-0 bottom-0 transition-all duration-300 ease-in-out z-40">
-            {/* Right sidebar content */}
+            {rightSidebarContent === 'chat' && selectedFriend ? (
+              // Chat sidebar
+              <>
+                {/* Chat header */}
+                <div className="p-4 border-b border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm flex items-center">
+                  <button 
+                    className="mr-3 text-[#8F8FA3] hover:text-white"
+                    onClick={() => {
+                      setRightSidebarContent('friends');
+                      setSelectedFriend(null);
+                    }}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                    <img 
+                      src={selectedFriend.profilePic || selectedFriend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`)} 
+                      alt={selectedFriend.userName || selectedFriend.name || 'User'} 
+                      className="w-9 h-9 rounded-full object-cover relative z-10"
+                    />
+                  </div>
+                  <div className="ml-3 flex-1 truncate">
+                    <h3 className="font-semibold truncate">{selectedFriend.userName || selectedFriend.name || 'Unknown User'}</h3>
+                    <p className="text-xs text-[#8F8FA3]">
+                      {selectedFriend.status || 'Online'}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Messages area */}
+                <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B]">
+                  {loading ? (
+                    <div className="flex justify-center items-center h-32">
+                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-32 text-[#8F8FA3]">
+                      <MessageSquare size={32} className="mb-2 opacity-20" />
+                      <p className="text-sm">No messages yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {messages.map((message, index) => {
+                        const isMyMessage = message.senderId === userId;
+                        return (
+                          <div 
+                            key={message.id || index}
+                            className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[90%] rounded-2xl p-2 ${
+                                isMyMessage 
+                                  ? 'bg-[#4D5DFE]/90 text-white rounded-tr-none' 
+                                  : 'bg-[#1E1E29]/80 backdrop-blur-sm text-white rounded-tl-none'
+                              } ${message.pending ? 'opacity-70' : ''}`}
+                            >
+                              <p className="text-sm">{message.text}</p>
+                              <p className="text-xs text-right opacity-70">
+                                {typeof message.timestamp === 'object' 
+                                  ? message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+                                  : new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                                }
+                                {message.pending && ' • Sending...'}
+                                {message.error && ' • Failed to send'}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Message input */}
+                <div className="p-3 border-t border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm">
+                  <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type a message..."
+                      className="flex-1 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#4D5DFE] backdrop-blur-sm"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newMessage.trim() || socketStatus === 'disconnected'}
+                      className="p-2 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Send size={16} />
+                    </button>
+                  </form>
+                </div>
+              </>
+            ) : rightSidebarContent === 'friends' ? (
+              // Friends sidebar
+              <>
+                <div className="p-4 border-b border-[#2A2A3A] flex justify-between items-center">
+                  <h2 className="font-semibold">Friends</h2>
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => setRightSidebarContent('users')}
+                      className="p-1.5 bg-[#1E1E29]/60 hover:bg-[#1E1E29] rounded-md transition-colors"
+                      title="Find Friends"
+                    >
+                      <UserPlus size={16} className="text-[#8F8FA3]" />
+                    </button>
+                    <button 
+                      onClick={() => setRightSidebarContent('requests')}
+                      className="p-1.5 bg-[#1E1E29]/60 hover:bg-[#1E1E29] rounded-md transition-colors relative"
+                      title="Friend Requests"
+                    >
+                      <Bell size={16} className="text-[#8F8FA3]" />
+                      {friendRequests.length > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-[#4D5DFE] text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
+                          {friendRequests.length}
+                        </span>
+                      )}
+                    </button>
+                    <button 
+                      onClick={() => setRightSidebarContent(null)}
+                      className="p-1.5 bg-[#1E1E29]/60 hover:bg-[#1E1E29] rounded-md transition-colors"
+                      title="Close"
+                    >
+                      <X size={16} className="text-[#8F8FA3]" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="p-3">
+                  <div className="relative mb-3">
+                    <input
+                      type="text"
+                      placeholder="Search friends..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 pl-8 text-sm focus:outline-none focus:border-[#4D5DFE]"
+                    />
+                    <Search className="absolute left-2.5 top-2.5 text-[#8F8FA3]" size={14} />
+                  </div>
+                  
+                  {loading ? (
+                    <div className="flex justify-center items-center h-32">
+                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                    </div>
+                  ) : friends.length === 0 ? (
+                    <div className="text-center p-4 bg-[#14141B]/60 rounded-lg border border-[#2A2A3A]">
+                      <Users className="mx-auto mb-3 text-[#8F8FA3]" size={24} />
+                      <h3 className="text-sm font-semibold mb-1">No friends yet</h3>
+                      <p className="text-xs text-[#8F8FA3] mb-3">Connect with other users to chat</p>
+                      <button 
+                        onClick={() => setRightSidebarContent('users')} 
+                        className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-3 py-1.5 rounded-md text-xs transition-colors inline-flex items-center"
+                      >
+                        <UserPlus size={12} className="mr-1.5" />
+                        Find Friends
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 overflow-y-auto custom-scrollbar max-h-[calc(100vh-180px)]">
+                      {friends
+                        .filter(friend => 
+                          (friend.userName?.toLowerCase() || friend.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                        )
+                        .map(friend => (
+                          <div 
+                            key={friend._id || friend.id} 
+                            className="flex items-center p-2 hover:bg-[#1E1E29]/60 rounded-md cursor-pointer transition-colors"
+                            onClick={() => handleSelectFriend(friend)}
+                          >
+                            <div className="relative">
+                              <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                              <img 
+                                src={friend.profilePic || friend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`)} 
+                                alt={friend.userName || friend.name || 'User'} 
+                                className="w-9 h-9 rounded-full object-cover relative z-10"
+                              />
+                            </div>
+                            <div className="ml-2 truncate">
+                              <h4 className="font-medium text-sm truncate">{friend.userName || friend.name || 'Unknown User'}</h4>
+                              <p className="text-xs text-[#8F8FA3] truncate">
+                                {friend.status || 'Online'}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : rightSidebarContent === 'users' ? (
+              // Find friends sidebar
+              <>
+                <div className="p-4 border-b border-[#2A2A3A] flex justify-between items-center">
+                  <h2 className="font-semibold">Find Friends</h2>
+                  <button 
+                    onClick={() => setRightSidebarContent('friends')}
+                    className="p-1.5 bg-[#1E1E29]/60 hover:bg-[#1E1E29] rounded-md transition-colors"
+                    title="Back to Friends"
+                  >
+                    <ChevronLeft size={16} className="text-[#8F8FA3]" />
+                  </button>
+                </div>
+                
+                <div className="p-3">
+                  <div className="relative mb-3">
+                    <input
+                      type="text"
+                      placeholder="Search users..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 pl-8 text-sm focus:outline-none focus:border-[#4D5DFE]"
+                    />
+                    <Search className="absolute left-2.5 top-2.5 text-[#8F8FA3]" size={14} />
+                  </div>
+                  
+                  {loading ? (
+                    <div className="flex justify-center items-center h-32">
+                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                    </div>
+                  ) : users.length === 0 ? (
+                    <div className="text-center p-4 bg-[#14141B]/60 rounded-lg border border-[#2A2A3A]">
+                      <Users className="mx-auto mb-3 text-[#8F8FA3]" size={24} />
+                      <h3 className="text-sm font-semibold mb-1">No users found</h3>
+                      <p className="text-xs text-[#8F8FA3]">Try searching for different users</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 overflow-y-auto custom-scrollbar max-h-[calc(100vh-180px)]">
+                      {users
+                        .filter(user => 
+                          (user.userName?.toLowerCase() || user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                        )
+                        .slice(0, 20) // Limit to first 20 matches
+                        .map(user => (
+                          <div 
+                            key={user._id || user.id} 
+                            className="flex items-center justify-between p-2 hover:bg-[#1E1E29]/60 rounded-md transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <div className="relative">
+                                <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                                <img 
+                                  src={user.profilePic || user.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName || user.name || 'User')}&background=4D5DFE&color=fff`)} 
+                                  alt={user.userName || user.name || 'User'} 
+                                  className="w-8 h-8 rounded-full object-cover relative z-10"
+                                />
+                              </div>
+                              <div className="ml-2 truncate">
+                                <h4 className="font-medium text-sm truncate">{user.userName || user.name || 'Unknown User'}</h4>
+                              </div>
+                            </div>
+                            <button 
+                              className="p-1.5 bg-[#4D5DFE]/20 hover:bg-[#4D5DFE]/30 text-[#4D5DFE] rounded-md text-xs transition-colors" 
+                              onClick={() => handleSendFriendRequest(user.id)}
+                            >
+                              <UserPlus size={14} />
+                            </button>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : rightSidebarContent === 'requests' ? (
+              // Friend requests sidebar
+              <>
+                <div className="p-4 border-b border-[#2A2A3A] flex justify-between items-center">
+                  <h2 className="font-semibold">Friend Requests</h2>
+                  <button 
+                    onClick={() => setRightSidebarContent('friends')}
+                    className="p-1.5 bg-[#1E1E29]/60 hover:bg-[#1E1E29] rounded-md transition-colors"
+                    title="Back to Friends"
+                  >
+                    <ChevronLeft size={16} className="text-[#8F8FA3]" />
+                  </button>
+                </div>
+                
+                <div className="p-3">
+                  {loading ? (
+                    <div className="flex justify-center items-center h-32">
+                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+                    </div>
+                  ) : friendRequests.length === 0 ? (
+                    <div className="text-center p-4 bg-[#14141B]/60 rounded-lg border border-[#2A2A3A]">
+                      <Bell className="mx-auto mb-3 text-[#8F8FA3]" size={24} />
+                      <h3 className="text-sm font-semibold mb-1">No requests</h3>
+                      <p className="text-xs text-[#8F8FA3]">You don't have any pending friend requests</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 overflow-y-auto custom-scrollbar max-h-[calc(100vh-180px)]">
+                      {friendRequests.map((request, index) => (
+                        <div key={request.id || request._id || index} className="bg-[#1E1E29]/40 rounded-lg p-3 border border-[#2A2A3A]">
+                          <div className="flex items-center mb-2">
+                            <div className="relative">
+                              <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
+                              <img 
+                                src={request.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(request.userName || request.name || 'User')}&background=4D5DFE&color=fff`)} 
+                                alt={request.userName || request.name || 'User'} 
+                                className="w-10 h-10 rounded-full object-cover relative z-10"
+                              />
+                            </div>
+                            <div className="ml-2 truncate">
+                              <h4 className="font-medium text-sm truncate">{request.userName || request.name || 'Unknown User'}</h4>
+                              <p className="text-xs text-[#8F8FA3]">
+                                Sent you a request
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleAcceptFriendRequest(request.id)}
+                              className="flex-1 p-1.5 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md text-xs flex items-center justify-center transition-colors"
+                            >
+                              <Check size={12} className="mr-1" />
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectFriendRequest(request.id)}
+                              className="flex-1 p-1.5 bg-[#E94560]/10 hover:bg-[#E94560]/20 text-[#E94560] rounded-md text-xs flex items-center justify-center transition-colors"
+                            >
+                              <X size={12} className="mr-1" />
+                              Decline
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : null}
           </div>
         )}
       </div>
