@@ -68,6 +68,8 @@ function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [projectSearchTerm, setProjectSearchTerm] = useState('');
+  const [friendSearchTerm, setFriendSearchTerm] = useState('');
   const [roomId, setRoomId] = useState('');
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -132,6 +134,14 @@ function Dashboard() {
     // Cleanup
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Add useEffect to fetch tasks and projects when component mounts
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetchProjects();
+      fetchTasks(); // Fetch tasks when component mounts
+    }
+  }, [isAuthenticated, token]);
 
   // Apply dark mode with bluish glow effects
   useEffect(() => {
@@ -976,6 +986,7 @@ function Dashboard() {
     } else {
       // For desktop: Use the right sidebar for chat
       setRightSidebarContent('chat');
+      // Don't change the main content when selecting a friend on desktop
     }
     
     // Fetch messages for the selected friend
@@ -1287,12 +1298,16 @@ function Dashboard() {
   const fetchTasks = async () => {
     setLoading(true);
     try {
+      console.log('Fetching tasks...');
+      
       const response = await axios.get(`${API_BASE_URL}/api/tasks`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
         withCredentials: true
       });
+      
+      console.log('Tasks API response:', response.data);
       
       // Organize tasks by status
       const tasksByStatus = {
@@ -1301,37 +1316,69 @@ function Dashboard() {
         done: []
       };
       
-      (response.data.tasks || []).forEach(task => {
-        if (task.status === 'Todo') {
-          tasksByStatus.todo.push(task);
-        } else if (task.status === 'In Progress') {
-          tasksByStatus.inProgress.push(task);
-        } else if (task.status === 'Done') {
-          tasksByStatus.done.push(task);
+      // Check if we got an array directly or wrapped in a tasks property
+      const tasksArray = Array.isArray(response.data) 
+        ? response.data 
+        : response.data.tasks || [];
+      
+      tasksArray.forEach(task => {
+        // Convert _id to id for consistency
+        const processedTask = {
+          id: task._id || task.id,
+          title: task.title,
+          description: task.description || '',
+          priority: task.priority || 'medium',
+          dueDate: task.dueDate,
+          status: task.status
+        };
+        
+        // Add to the appropriate column based on status
+        if (task.status === 'todo') {
+          tasksByStatus.todo.push(processedTask);
+        } else if (task.status === 'inProgress') {
+          tasksByStatus.inProgress.push(processedTask);
+        } else if (task.status === 'done') {
+          tasksByStatus.done.push(processedTask);
         } else {
-          tasksByStatus.todo.push(task);
+          // Default to todo for unknown status
+          tasksByStatus.todo.push(processedTask);
         }
       });
       
+      console.log('Organized tasks:', tasksByStatus);
       setTasks(tasksByStatus);
       setError(null);
     } catch (err) {
       console.error('Error fetching tasks:', err);
+      if (err.response) {
+        console.error('API error details:', err.response.data);
+      }
       setError('Failed to fetch tasks');
-      // For demo, create some sample tasks if fetch fails
-      setTasks({
-        todo: [
-          { id: '1', title: 'Design landing page', description: 'Create wireframes and UI mockups', priority: 'medium', dueDate: new Date() },
-          { id: '2', title: 'Update API documentation', description: 'Document new endpoints', priority: 'low', dueDate: new Date() }
-        ],
-        inProgress: [
-          { id: '3', title: 'Implement user authentication', description: 'Add login and signup functionality', priority: 'high', dueDate: new Date() },
-          { id: '4', title: 'Code review for PR #42', description: 'Review pull request from team', priority: 'high', dueDate: new Date() }
-        ],
-        done: [
-          { id: '5', title: 'Fix responsive layout issues', description: 'Address mobile display problems', priority: 'medium', dueDate: new Date() }
-        ]
-      });
+      
+      // Only show demo tasks in development environment
+      if (process.env.NODE_ENV === 'development') {
+        // For demo, create some sample tasks if fetch fails
+        setTasks({
+          todo: [
+            { id: '1', title: 'Design landing page', description: 'Create wireframes and UI mockups', priority: 'medium', dueDate: new Date() },
+            { id: '2', title: 'Update API documentation', description: 'Document new endpoints', priority: 'low', dueDate: new Date() }
+          ],
+          inProgress: [
+            { id: '3', title: 'Implement user authentication', description: 'Add login and signup functionality', priority: 'high', dueDate: new Date() },
+            { id: '4', title: 'Code review for PR #42', description: 'Review pull request from team', priority: 'high', dueDate: new Date() }
+          ],
+          done: [
+            { id: '5', title: 'Fix responsive layout issues', description: 'Address mobile display problems', priority: 'medium', dueDate: new Date() }
+          ]
+        });
+      } else {
+        // In production, show empty task lists
+        setTasks({
+          todo: [],
+          inProgress: [],
+          done: []
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -1372,41 +1419,80 @@ function Dashboard() {
     });
   };
 
-  // Handle adding a new task
+  // Fix handleAddTask to match the backend schema
   const handleAddTask = async () => {
     if (!newTask.title.trim()) {
       showError('Task title is required');
       return;
     }
     
+    // Generate a temporary ID for immediate UI feedback
+    const tempId = `temp_${Date.now()}`;
+    
+    // Add task to UI immediately for better user experience
+    setTasks(prev => ({
+      ...prev,
+      [newTaskColumn]: [...prev[newTaskColumn], {
+        id: tempId,
+        title: newTask.title,
+        description: newTask.description,
+        priority: newTask.priority,
+        dueDate: newTask.dueDate,
+        isTemporary: true // Flag to identify temporary tasks
+      }]
+    }));
+    
+    // Reset form immediately
+    setShowNewTaskForm(false);
+    
     try {
       setLoading(true);
       
-      const response = await axios.post(`${API_BASE_URL}/api/tasks`, {
-        ...newTask,
-        status: newTaskColumn === 'todo' ? 'Todo' : 
-                newTaskColumn === 'inProgress' ? 'In Progress' : 'Done'
-      }, {
+      // Convert status to expected backend format
+      let taskStatus;
+      if (newTaskColumn === 'todo') {
+        taskStatus = 'todo';
+      } else if (newTaskColumn === 'inProgress') {
+        taskStatus = 'inProgress';
+      } else {
+        taskStatus = 'done';
+      }
+      
+      // Prepare the data to send to the backend
+      const taskData = {
+        title: newTask.title,
+        description: newTask.description || '',
+        priority: newTask.priority,
+        dueDate: newTask.dueDate,
+        status: taskStatus // Using enum values from mongoose schema
+      };
+      
+      console.log('Sending task data to API:', taskData);
+      
+      const response = await axios.post(`${API_BASE_URL}/api/tasks`, taskData, {
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
         withCredentials: true
       });
       
       if (response.data) {
-        // Add the new task to the appropriate column
+        console.log('Task created successfully:', response.data);
+        
+        // Replace the temporary task with the real one from the server
         setTasks(prev => ({
           ...prev,
-          [newTaskColumn]: [...prev[newTaskColumn], {
-            id: response.data._id,
-            title: newTask.title,
-            description: newTask.description,
-            priority: newTask.priority,
-            dueDate: newTask.dueDate
-          }]
+          [newTaskColumn]: prev[newTaskColumn].map(task => 
+            task.id === tempId ? {
+              ...task,
+              id: response.data._id || response.data.id,
+              isTemporary: false
+            } : task
+          )
         }));
         
-        // Reset form
+        // Reset task form data
         setNewTask({
           title: '',
           description: '',
@@ -1414,34 +1500,16 @@ function Dashboard() {
           dueDate: new Date().toISOString().split('T')[0]
         });
         
-        setShowNewTaskForm(false);
         showSuccess('Task added successfully');
       }
     } catch (err) {
       console.error('Error adding task:', err);
-      showError('Failed to add task');
+      if (err.response && err.response.data) {
+        console.error('Server error details:', err.response.data);
+      }
+      showError('Task saved locally only. Server error occurred.');
       
-      // Add task locally if API fails (for demo)
-      setTasks(prev => ({
-        ...prev,
-        [newTaskColumn]: [...prev[newTaskColumn], {
-          id: `temp_${Date.now()}`,
-          title: newTask.title,
-          description: newTask.description,
-          priority: newTask.priority,
-          dueDate: newTask.dueDate
-        }]
-      }));
-      
-      // Reset form
-      setNewTask({
-        title: '',
-        description: '',
-        priority: 'medium',
-        dueDate: new Date().toISOString().split('T')[0]
-      });
-      
-      setShowNewTaskForm(false);
+      // Note: We keep the temporary task in the UI since we already added it
     } finally {
       setLoading(false);
     }
@@ -1597,27 +1665,101 @@ function Dashboard() {
     }
   };
 
-  // Handle moving a task between columns via drag and drop
+  // Fix handleDragEnd to use correct status format
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
     
-    // Return if dropped outside a droppable area or in the same position
-    if (!destination || 
-        (destination.droppableId === source.droppableId && 
-         destination.index === source.index)) {
+    // Return if dropped outside a droppable area
+    if (!destination) {
       return;
     }
     
-    // Find the task that was dragged
-    const sourceColumn = source.droppableId;
-    const targetColumn = destination.droppableId;
-    const taskId = draggableId;
+    // Return if dropped in the same position
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
     
-    // Handle the task move with our existing function
-    await handleMoveTask(taskId, sourceColumn, targetColumn);
+    // Find the source and destination lists
+    const sourceList = tasks[source.droppableId];
+    const destinationList = tasks[destination.droppableId];
+    
+    // Create a copy of the task
+    const task = sourceList.find(task => task.id === draggableId);
+    
+    if (!task) {
+      console.error(`Task with ID ${draggableId} not found in ${source.droppableId}`);
+      return;
+    }
+    
+    // Create updated lists
+    let newSourceList = [...sourceList];
+    
+    // Remove from source list
+    newSourceList.splice(source.index, 1);
+    
+    let newDestinationList;
+    
+    if (source.droppableId === destination.droppableId) {
+      // Moving within the same list
+      newDestinationList = newSourceList; // already removed the task
+      newDestinationList.splice(destination.index, 0, task);
+    } else {
+      // Moving to a different list
+      newDestinationList = [...destinationList];
+      newDestinationList.splice(destination.index, 0, task);
+    }
+    
+    // Update the task status when moving between columns
+    if (source.droppableId !== destination.droppableId) {
+      // Use the column ID directly as the status (matches backend enum)
+      task.status = destination.droppableId;
+    }
+    
+    // Update state with new lists
+    setTasks({
+      ...tasks,
+      [source.droppableId]: newSourceList,
+      [destination.droppableId]: newDestinationList
+    });
+    
+    // If moved to a different column, update in the backend (only for non-temporary tasks)
+    if (source.droppableId !== destination.droppableId && !task.isTemporary && !draggableId.startsWith('temp_')) {
+      try {
+        // Status is directly the destination droppableId (matches backend enum)
+        const updateData = {
+          status: destination.droppableId // Using direct enum values that match the backend
+        };
+        
+        console.log(`Updating task ${draggableId} status to: ${destination.droppableId}`);
+        
+        await axios.put(`${API_BASE_URL}/api/tasks/${draggableId}`, updateData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          withCredentials: true
+        });
+        
+        showSuccess('Task moved successfully');
+      } catch (err) {
+        console.error('Error moving task:', err);
+        if (err.response && err.response.data) {
+          console.error('Server error details:', err.response.data);
+        }
+        showError('Task moved locally. Failed to update on server.');
+        
+        // We keep the UI state as is since we've already updated it
+      }
+    } else if (source.droppableId !== destination.droppableId) {
+      // For temporary tasks, just show a message
+      console.log('Skipping backend update for temporary task', draggableId);
+    }
   };
 
-  // Friends are now managed by state
+    // Friends are now managed by state
 
   return (
     <div className="min-h-screen bg-[#0F0F13] text-white relative overflow-hidden">
@@ -1763,8 +1905,8 @@ function Dashboard() {
                 <input
                   type="text"
                   placeholder="Search projects..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={projectSearchTerm}
+                  onChange={(e) => setProjectSearchTerm(e.target.value)}
                   className="w-full py-2 pl-10 pr-4 bg-[#1E1E29]/60 border border-[#2A2A3A] rounded-md text-white placeholder-[#8F8FA3] focus:outline-none focus:border-[#4D5DFE]"
                 />
                 <Search className="absolute left-3 top-2.5 text-[#8F8FA3]" size={18} />
@@ -1791,8 +1933,8 @@ function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {projects
                     .filter(project => 
-                      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase()))
+                      project.name.toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
+                      (project.description && project.description.toLowerCase().includes(projectSearchTerm.toLowerCase()))
                     )
                     .map(project => (
                     <div 
@@ -2292,8 +2434,8 @@ function Dashboard() {
                       <input
                         type="text"
                         placeholder="Search friends..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={friendSearchTerm}
+                        onChange={(e) => setFriendSearchTerm(e.target.value)}
                         className="w-40 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md py-1 pl-7 pr-2 text-xs focus:outline-none focus:border-[#4D5DFE]"
                       />
                       <Search className="absolute left-2 top-1.5 text-[#8F8FA3]" size={12} />
@@ -2321,7 +2463,7 @@ function Dashboard() {
                     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                       {friends
                         .filter(friend => 
-                          (friend.userName?.toLowerCase() || friend.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                          (friend.userName?.toLowerCase() || friend.name?.toLowerCase() || '').includes(friendSearchTerm.toLowerCase())
                         )
                         .map(friend => (
                           <div 
@@ -2732,8 +2874,8 @@ function Dashboard() {
                     <input
                       type="text"
                       placeholder="Search friends..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      value={friendSearchTerm}
+                      onChange={(e) => setFriendSearchTerm(e.target.value)}
                       className="w-full bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 pl-8 text-sm focus:outline-none focus:border-[#4D5DFE]"
                     />
                     <Search className="absolute left-2.5 top-2.5 text-[#8F8FA3]" size={14} />
@@ -2760,7 +2902,7 @@ function Dashboard() {
                     <div className="space-y-2 overflow-y-auto custom-scrollbar max-h-[calc(100vh-180px)]">
                       {friends
                         .filter(friend => 
-                          (friend.userName?.toLowerCase() || friend.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                          (friend.userName?.toLowerCase() || friend.name?.toLowerCase() || '').includes(friendSearchTerm.toLowerCase())
                         )
                         .map(friend => (
                           <div 
