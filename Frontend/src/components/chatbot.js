@@ -100,15 +100,38 @@ export default function ChatbotPage() {
   const [chatHistory, setChatHistory] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true) // Default to dark mode
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false) // Default closed on mobile
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [conversations, setConversations] = useState([])
   const [activeConversation, setActiveConversation] = useState("")
   const [isNamingChat, setIsNamingChat] = useState(false)
   const [newChatName, setNewChatName] = useState("")
   const [isLoadingConversation, setIsLoadingConversation] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const chatContainerRef = useRef(null)
   const textareaRef = useRef(null)
+
+  // Detect mobile view
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Auto-close sidebar on mobile
+      if (mobile && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
+      // Auto-open sidebar on desktop if it was closed due to mobile
+      if (!mobile && !isSidebarOpen && !wasManuallyToggled.current) {
+        setIsSidebarOpen(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isSidebarOpen]);
+
+  // Track if sidebar was manually toggled
+  const wasManuallyToggled = useRef(false);
 
   // Load theme from local storage
   useEffect(() => {
@@ -116,6 +139,9 @@ export default function ChatbotPage() {
     if (savedTheme) {
       setIsDarkMode(savedTheme === "dark");
     }
+    
+    // Initialize sidebar based on screen size
+    setIsSidebarOpen(window.innerWidth >= 768);
   }, []);
 
   // Apply the custom dark theme style on component mount
@@ -619,7 +645,8 @@ export default function ChatbotPage() {
   }
 
   const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen)
+    wasManuallyToggled.current = true;
+    setIsSidebarOpen(!isSidebarOpen);
   }
 
   const handleSendMessage = async () => {
@@ -857,26 +884,26 @@ export default function ChatbotPage() {
     <div className="flex h-screen bg-[#0F0F13] text-white">
       {/* Mobile menu overlay */}
       <AnimatePresence>
-        {isMenuOpen && (
+        {isMenuOpen && isMobile && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="md:hidden fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm z-10"
+            className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm z-30"
             onClick={toggleMenu}
           />
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
+      {/* Sidebar - fullscreen on mobile */}
       <AnimatePresence>
         {(isSidebarOpen || isMenuOpen) && (
           <motion.aside
-            initial={{ x: -300, opacity: 0 }}
+            initial={{ x: isMobile ? -window.innerWidth : -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
+            exit={{ x: isMobile ? -window.innerWidth : -300, opacity: 0 }}
             transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
-            className="fixed md:relative z-20 w-72 h-full flex flex-col bg-[#14141B]/90 border-r border-[#2A2A3A] shadow-xl backdrop-blur-sm"
+            className={`fixed md:relative z-40 ${isMobile ? 'w-full' : 'w-72'} h-full flex flex-col bg-[#14141B]/95 border-r border-[#2A2A3A] shadow-xl backdrop-blur-sm`}
           >
             {/* Sidebar header */}
             <div className="flex items-center justify-between p-4 border-b border-[#2A2A3A]">
@@ -906,7 +933,10 @@ export default function ChatbotPage() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={createNewChat}
+                onClick={() => {
+                  createNewChat();
+                  if (isMobile) toggleMenu();
+                }}
                 className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg bg-[#4D5DFE]/10 hover:bg-[#4D5DFE]/20 text-white font-medium border border-[#4D5DFE]/20 shadow-lg glow-effect transition-all duration-300"
               >
                 <Plus size={18} className="text-[#4D5DFE]" />
@@ -922,7 +952,10 @@ export default function ChatbotPage() {
                   <motion.div
                     key={conv._id}
                     whileHover={{ scale: 1.02, x: 4 }}
-                    onClick={() => switchConversation(conv._id)}
+                    onClick={() => {
+                      switchConversation(conv._id);
+                      if (isMobile) toggleMenu();
+                    }}
                     className={`flex items-center justify-between p-3 mb-1 rounded-lg cursor-pointer group ${
                       activeConversation === conv._id
                         ? "bg-[#2A2A3A]/70 text-white border border-[#2A2A3A] card-glow"
@@ -966,8 +999,8 @@ export default function ChatbotPage() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col h-full relative">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#2A2A3A] bg-[#14141B]/90 shadow-md backdrop-blur-sm">
+        {/* Header - Gemini-style mobile header */}
+        <div className="flex items-center justify-between p-4 border-b border-[#2A2A3A] bg-[#14141B]/95 shadow-md backdrop-blur-sm">
           <div className="flex items-center">
             <motion.button
               whileHover={{ scale: 1.1 }}
@@ -983,39 +1016,55 @@ export default function ChatbotPage() {
             </h2>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={toggleSidebar}
-            className="hidden md:block p-2 rounded-full hover:bg-[#2A2A3A]/50 text-[#8F8FA3]"
-          >
-            {isSidebarOpen ? <PanelLeft size={18} /> : <PanelRight size={18} />}
-          </motion.button>
+          <div className="flex items-center space-x-1">
+            {!isMobile && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={toggleSidebar}
+                className="p-2 rounded-full hover:bg-[#2A2A3A]/50 text-[#8F8FA3]"
+              >
+                {isSidebarOpen ? <PanelLeft size={18} /> : <PanelRight size={18} />}
+              </motion.button>
+            )}
+            
+            {/* Mobile actions button */}
+            {isMobile && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={createNewChat}
+                className="p-2 rounded-full hover:bg-[#2A2A3A]/50 text-[#8F8FA3]"
+              >
+                <Plus size={18} />
+              </motion.button>
+            )}
+          </div>
         </div>
 
         {/* Chat container */}
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar"
+          className="flex-1 overflow-y-auto p-3 md:p-6 custom-scrollbar"
           style={{
             backgroundImage: "radial-gradient(circle at 25% 25%, rgba(77, 93, 254, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(77, 93, 254, 0.03) 0%, transparent 50%)"
           }}
         >
-          <div className="max-w-3xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
             {/* Welcome message if no messages and not currently loading */}
             {chatHistory.length === 0 && !isLoading && !isLoadingConversation && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-center p-8 rounded-xl bg-[#14141B]/80 border border-[#2A2A3A] shadow-lg backdrop-blur-sm card-glow"
+                className="text-center p-6 md:p-8 rounded-xl bg-[#14141B]/80 border border-[#2A2A3A] shadow-lg backdrop-blur-sm card-glow"
               >
-                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-[#4D5DFE] to-[#3A4AE1] border border-[#2A2A3A] avatar-glow">
-                  <MessageSquare size={24} className="text-white" />
+                <div className="mx-auto w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-[#4D5DFE] to-[#3A4AE1] border border-[#2A2A3A] avatar-glow">
+                  <MessageSquare size={isMobile ? 20 : 24} className="text-white" />
                 </div>
                 <h3 className="text-lg font-bold mb-2 text-white">Welcome to AI Chatbot</h3>
                 <p className="text-[#8F8FA3] mb-6">Ask me anything and I'll do my best to help!</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-md mx-auto text-sm">
+                <div className={`grid grid-cols-1 ${isMobile ? '' : 'md:grid-cols-2'} gap-2 max-w-md mx-auto text-sm`}>
                   {["How can I learn React?", "Write a poem about coding", "What are the best practices for API design?", "Explain quantum computing"].map((suggestion, index) => (
                     <motion.button
                       key={index}
@@ -1036,17 +1085,17 @@ export default function ChatbotPage() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-center p-8 rounded-xl bg-[#14141B]/80 border border-[#2A2A3A] shadow-lg backdrop-blur-sm"
+                className="text-center p-6 md:p-8 rounded-xl bg-[#14141B]/80 border border-[#2A2A3A] shadow-lg backdrop-blur-sm"
               >
-                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-[#4D5DFE]/20 to-[#3A4AE1]/20 border border-[#4D5DFE]/30">
-                  <div className="w-10 h-10 rounded-full border-4 border-[#4D5DFE]/30 border-t-[#4D5DFE] animate-spin"></div>
+                <div className="mx-auto w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center mb-4 bg-gradient-to-br from-[#4D5DFE]/20 to-[#3A4AE1]/20 border border-[#4D5DFE]/30">
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full border-3 md:border-4 border-[#4D5DFE]/30 border-t-[#4D5DFE] animate-spin"></div>
                 </div>
                 <h3 className="text-lg font-bold mb-2 text-white">Loading Conversation</h3>
                 <p className="text-[#8F8FA3]">Retrieving your chat history...</p>
               </motion.div>
             )}
 
-            {/* Chat messages */}
+            {/* Chat messages - Gemini-style bubbles */}
             <AnimatePresence>
               {chatHistory.map((message, index) => (
                 <motion.div
@@ -1054,16 +1103,16 @@ export default function ChatbotPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 > 0.5 ? 0.5 : index * 0.1 }}
-                  className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
+                  className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} mb-2 md:mb-3`}
                 >
                   <div
-                    className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 ${
+                    className={`max-w-[90%] md:max-w-[75%] rounded-2xl px-3 py-2 md:px-4 md:py-3 ${
                       message.sender === "user"
                         ? "message-user text-white rounded-tr-none"
                         : "message-bot text-white rounded-tl-none"
                     }`}
                   >
-                    <div className="prose prose-sm max-w-none">
+                    <div className={`prose prose-sm max-w-none ${isMobile ? 'text-sm' : ''}`}>
                       {message.sender === "user" ? message.text : <div dangerouslySetInnerHTML={{ __html: message.text }} />}
                     </div>
                   </div>
@@ -1078,7 +1127,7 @@ export default function ChatbotPage() {
                 animate={{ opacity: 1 }}
                 className="flex justify-start"
               >
-                <div className="max-w-[75%] rounded-2xl px-4 py-3 bg-[#14141B]/80 text-[#8F8FA3] border border-[#2A2A3A] backdrop-blur-sm">
+                <div className="max-w-[75%] rounded-2xl px-3 py-2 md:px-4 md:py-3 bg-[#14141B]/80 text-[#8F8FA3] border border-[#2A2A3A] backdrop-blur-sm">
                   <div className="flex space-x-2 items-center">
                     <div className="w-2 h-2 rounded-full bg-[#4D5DFE] animate-bounce" style={{ animationDelay: "0ms" }}></div>
                     <div className="w-2 h-2 rounded-full bg-[#4D5DFE] animate-bounce" style={{ animationDelay: "150ms" }}></div>
@@ -1090,67 +1139,76 @@ export default function ChatbotPage() {
           </div>
         </div>
 
-        {/* Input area */}
-        <div className="p-4 border-t border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm">
+        {/* Input area - Gemini-style rounded input */}
+        <div className="p-3 md:p-4 border-t border-[#2A2A3A] bg-[#14141B]/95 backdrop-blur-sm">
           <div className="max-w-3xl mx-auto relative">
             {/* Rename chat interface */}
             {isNamingChat ? (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-4 rounded-lg bg-[#1E1E29]/90 border border-[#2A2A3A] card-glow backdrop-blur-sm"
-              >
-                <label className="block text-sm font-medium mb-2 text-[#8F8FA3]">Name this conversation</label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={newChatName}
-                    onChange={(e) => setNewChatName(e.target.value)}
-                    onKeyPress={handleNameKeyPress}
-                    placeholder="Enter a name for this chat"
-                    className="flex-1 rounded-lg p-2 bg-[#0F0F13] border border-[#2A2A3A] text-white focus:border-[#4D5DFE] focus:outline-none input-glow transition-colors"
-                    autoFocus
-                  />
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={saveChatName}
-                    className="px-4 py-2 rounded-lg bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white shadow-md glow-effect"
-                  >
-                    Save
-                  </motion.button>
-                </div>
-              </motion.div>
-            ) : null}
-
-            {/* Message input */}
-            <div className="flex items-end space-x-2 rounded-xl p-2 bg-[#1E1E29]/80 border border-[#2A2A3A] shadow-lg backdrop-blur-sm">
-              <textarea
-                ref={textareaRef}
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                className="flex-1 resize-none overflow-y-auto max-h-28 p-3 rounded-lg bg-[#14141B]/70 text-white placeholder-[#8F8FA3] border border-[#2A2A3A] focus:border-[#4D5DFE] focus:ring-0 focus:outline-none input-glow transition-colors"
-              />
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleSendMessage}
-                disabled={!userInput.trim() || isLoading}
-                className={`p-3 rounded-full transition-all ${
-                  !userInput.trim() || isLoading
-                    ? "bg-[#1E1E29] text-[#8F8FA3] cursor-not-allowed border border-[#2A2A3A]"
-                    : "send-button text-white"
-                }`}
-              >
-                <Send size={20} />
-              </motion.button>
-            </div>
+              <div className="mb-3 flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={newChatName}
+                  onChange={(e) => setNewChatName(e.target.value)}
+                  onKeyDown={handleNameKeyPress}
+                  placeholder="Enter chat name..."
+                  className="flex-1 rounded-lg py-2 px-3 bg-[#1E1E29]/80 border border-[#2A2A3A] focus:border-[#4D5DFE]/50 focus:outline-none focus:ring-0 input-glow text-white placeholder-[#8F8FA3]"
+                  autoFocus
+                />
+                <button 
+                  onClick={saveChatName}
+                  className="py-2 px-3 rounded-lg bg-[#4D5DFE] text-white text-sm font-medium"
+                >
+                  Save
+                </button>
+                <button 
+                  onClick={() => setIsNamingChat(false)}
+                  className="p-2 rounded-lg bg-[#2A2A3A] text-[#8F8FA3]"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="relative flex items-end md:items-center rounded-2xl overflow-hidden bg-[#1E1E29]/80 border border-[#2A2A3A] shadow-md focus-within:border-[#4D5DFE]/40 focus-within:input-glow transition-shadow">
+                <textarea
+                  ref={textareaRef}
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Ask me anything..."
+                  className="flex-1 py-3 pl-4 pr-12 bg-transparent border-none focus:outline-none focus:ring-0 text-white placeholder-[#8F8FA3] resize-none max-h-32 leading-normal text-sm md:text-base"
+                  rows={1}
+                ></textarea>
+                <motion.button
+                  whileTap={{ scale: 0.8 }}
+                  disabled={isLoading || userInput.trim() === ""}
+                  onClick={handleSendMessage}
+                  className={`absolute right-2 bottom-2 md:right-3 md:bottom-3 p-2 rounded-full ${
+                    isLoading || userInput.trim() === "" 
+                      ? "bg-[#2A2A3A] text-[#8F8FA3]" 
+                      : "send-button text-white"
+                  } transition-all duration-300`}
+                >
+                  <Send size={isMobile ? 16 : 18} />
+                </motion.button>
+              </div>
+            )}
           </div>
         </div>
+        
+        {/* Back to home fixed button on mobile - Gemini style */}
+        {isMobile && (
+          <Link to="/home" className="fixed bottom-20 right-4 z-10">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="p-3 rounded-full bg-[#1E1E29]/90 border border-[#2A2A3A] shadow-lg text-[#8F8FA3]"
+            >
+              <ArrowLeft size={20} />
+            </motion.button>
+          </Link>
+        )}
       </div>
     </div>
-  )
+  );
 }
 

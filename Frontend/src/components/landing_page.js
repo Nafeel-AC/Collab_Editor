@@ -271,23 +271,23 @@ export default function LandingPage() {
 
               {/* Desktop typewriter effect */}
               <div className="hidden md:flex justify-start w-full">
-                <TypewriterEffectSmooth
-                  words={[
-                    {
-                      text: "Collaborative",
+              <TypewriterEffectSmooth
+                words={[
+                  {
+                    text: "Collaborative",
                       className: "text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-bold drop-shadow-sm"
-                    },
-                    {
-                      text: "Code",
+                  },
+                  {
+                    text: "Code",
                       className: "text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-bold drop-shadow-sm"
-                    },
-                    {
-                      text: "Editor",
+                  },
+                  {
+                    text: "Editor",
                       className: "text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-bold drop-shadow-sm"
-                    }
-                  ]}
+                  }
+                ]}
                   className="font-playfair italic text-5xl lg:text-6xl xl:text-7xl font-bold w-full tracking-tight leading-tight"
-                />
+              />
               </div>
               <p className="mt-6 font-playfair italic text-lg md:text-lg font-normal text-gray-400 sm:mt-8 text-center md:text-left px-4 md:px-0">
                 Build your projects with your team in real-time. Share your
@@ -466,19 +466,19 @@ export default function LandingPage() {
               <div className="mt-8 md:mt-0 py-8 md:py-0">
                 <div className="relative w-full max-w-[400px] md:max-w-[500px] lg:max-w-[600px] mx-auto">
                   <div className="pb-[100%] relative">
-                    <DotLottieReact
-                      src="https://lottie.host/a349f2a2-00d0-4d10-947a-25eb5475015b/V4T6cReIh4.json"
-                      loop
-                      autoplay
-                      style={{
+              <DotLottieReact
+                src="https://lottie.host/a349f2a2-00d0-4d10-947a-25eb5475015b/V4T6cReIh4.json"
+                loop
+                autoplay
+                style={{
                         position: "absolute",
                         top: 0,
                         left: 0,
                         width: "100%", 
                         height: "100%",
-                        zIndex: 10,
-                      }}
-                    />
+                  zIndex: 10,
+                }}
+              />
                   </div>
                 </div>
               </div>
@@ -489,7 +489,7 @@ export default function LandingPage() {
 
       {/* Macbook Section */}
       <div className="hidden md:block">
-        <MacbookDemo />
+      <MacbookDemo />
       </div>
 
       {/* Carousel Section */}

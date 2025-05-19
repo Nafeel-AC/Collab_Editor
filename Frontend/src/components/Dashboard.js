@@ -73,6 +73,9 @@ function Dashboard() {
   const [newMessage, setNewMessage] = useState('');
   const [userId, setUserId] = useState(null);
 
+  // Add state for mobile sidebar visibility
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  
   // Create a ref to store the current message timeout
   const messageTimeoutRef = useRef(null);
 
@@ -903,9 +906,9 @@ function Dashboard() {
     navigate(`/editor/${roomId}`, { state: { username: userName } });
   };
 
-  // Handle selecting a friend to message
+  // Handle selecting a friend, close mobile sidebar when a friend is selected
   const handleSelectFriend = (friend) => {
-    console.log('Selected friend object:', friend);
+    setSelectedFriend(friend);
     
     // Make sure we have a valid friend object
     if (!friend) {
@@ -929,7 +932,7 @@ function Dashboard() {
     setRightSidebarContent('chat'); // Switch to chat view
     
     // Fetch messages for the selected friend
-    fetchMessages(normalizedFriend._id || normalizedFriend.id);
+    fetchMessages(friend._id || friend.id);
   };
 
   // Fetch messages for a selected friend
