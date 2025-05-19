@@ -819,10 +819,9 @@ const EditorPage = () => {
       }
       
       // Create project in backend
-      const response = await axios.post(`${API_BASE_URL}/api/projects`, {
+      const response = await axios.post(`${API_BASE_URL}/api/projects/save/${roomId}`, {
         name: projectName,
-        description: projectDescription,
-        roomId
+        description: projectDescription
       }, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
