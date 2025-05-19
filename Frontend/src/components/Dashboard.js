@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Navigate, useNavigate } from 'react-router-dom';
-import { Bell, Search, Plus, Code2, LogIn, MoreVertical, UserPlus, Check, X, Users, MessageSquare, Send, ChevronLeft, LogOut, Settings, FolderOpen, ChevronDown, Menu, Folder, List } from 'lucide-react';
+import { Bell, Search, Plus, Code2, LogIn, MoreVertical, UserPlus, Check, X, Users, MessageSquare, Send, ChevronLeft, LogOut, Settings, FolderOpen, ChevronDown, Menu, Folder, List, Trash2, Calendar, Clock, ArrowRight, Edit2, GripVertical } from 'lucide-react';
 import io from 'socket.io-client';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { showSuccess, showError } from '../utils/alertUtils';
 import { API_BASE_URL, getImageUrl } from '../config/api.config';
 
@@ -1237,18 +1238,19 @@ function Dashboard() {
   // Handle navigation to Projects or Tasks page
   const handleNavigation = (destination) => {
     setShowLeftSidebar(false);
+    setMainContent(destination);
     
-    if (content === 'projects') {
+    if (destination === 'projects') {
       fetchProjects();
-    } else if (content === 'tasks') {
+    } else if (destination === 'tasks') {
       fetchTasks();
     } else if (isMobileView) {
       // For mobile view, handle messages-related content in main area
-      if (content === 'messages') {
+      if (destination === 'messages') {
         setRightSidebarContent('friends');
-      } else if (content === 'findFriends') {
+      } else if (destination === 'findFriends') {
         setRightSidebarContent('users');
-      } else if (content === 'requests') {
+      } else if (destination === 'requests') {
         setRightSidebarContent('requests');
       }
     }
@@ -1360,6 +1362,261 @@ function Dashboard() {
     navigate('/create-room', { state: { username: userName } });
   };
 
+  // Format date to a readable format
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Handle adding a new task
+  const handleAddTask = async () => {
+    if (!newTask.title.trim()) {
+      showError('Task title is required');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      const response = await axios.post(`${API_BASE_URL}/api/tasks`, {
+        ...newTask,
+        status: newTaskColumn === 'todo' ? 'Todo' : 
+                newTaskColumn === 'inProgress' ? 'In Progress' : 'Done'
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
+      
+      if (response.data) {
+        // Add the new task to the appropriate column
+        setTasks(prev => ({
+          ...prev,
+          [newTaskColumn]: [...prev[newTaskColumn], {
+            id: response.data._id,
+            title: newTask.title,
+            description: newTask.description,
+            priority: newTask.priority,
+            dueDate: newTask.dueDate
+          }]
+        }));
+        
+        // Reset form
+        setNewTask({
+          title: '',
+          description: '',
+          priority: 'medium',
+          dueDate: new Date().toISOString().split('T')[0]
+        });
+        
+        setShowNewTaskForm(false);
+        showSuccess('Task added successfully');
+      }
+    } catch (err) {
+      console.error('Error adding task:', err);
+      showError('Failed to add task');
+      
+      // Add task locally if API fails (for demo)
+      setTasks(prev => ({
+        ...prev,
+        [newTaskColumn]: [...prev[newTaskColumn], {
+          id: `temp_${Date.now()}`,
+          title: newTask.title,
+          description: newTask.description,
+          priority: newTask.priority,
+          dueDate: newTask.dueDate
+        }]
+      }));
+      
+      // Reset form
+      setNewTask({
+        title: '',
+        description: '',
+        priority: 'medium',
+        dueDate: new Date().toISOString().split('T')[0]
+      });
+      
+      setShowNewTaskForm(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle moving a task between columns
+  const handleMoveTask = async (taskId, sourceColumn, targetColumn) => {
+    try {
+      // Find the task in the source column
+      const taskIndex = tasks[sourceColumn].findIndex(task => task.id === taskId);
+      if (taskIndex === -1) return;
+      
+      const taskToMove = tasks[sourceColumn][taskIndex];
+      
+      // Optimistically update UI
+      setTasks(prev => ({
+        ...prev,
+        [sourceColumn]: prev[sourceColumn].filter(task => task.id !== taskId),
+        [targetColumn]: [...prev[targetColumn], taskToMove]
+      }));
+      
+      // Update in the backend
+      const statusMap = {
+        todo: 'Todo',
+        inProgress: 'In Progress',
+        done: 'Done'
+      };
+      
+      await axios.put(`${API_BASE_URL}/api/tasks/${taskId}`, {
+        status: statusMap[targetColumn]
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
+      
+      showSuccess('Task moved successfully');
+    } catch (err) {
+      console.error('Error moving task:', err);
+      showError('Failed to move task');
+      
+      // Revert changes if API call fails
+      fetchTasks();
+    }
+  };
+  
+  // Handle editing a task
+  const handleEditTask = async () => {
+    if (!editingTask || !editingTask.title.trim()) {
+      showError('Task title is required');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Find the column the task is in
+      let taskColumn = null;
+      Object.keys(tasks).forEach(column => {
+        if (tasks[column].some(task => task.id === editingTask.id)) {
+          taskColumn = column;
+        }
+      });
+      
+      if (!taskColumn) {
+        throw new Error('Task not found');
+      }
+      
+      // Update in backend
+      await axios.put(`${API_BASE_URL}/api/tasks/${editingTask.id}`, {
+        title: editingTask.title,
+        description: editingTask.description,
+        priority: editingTask.priority,
+        dueDate: editingTask.dueDate
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
+      
+      // Update locally
+      setTasks(prev => ({
+        ...prev,
+        [taskColumn]: prev[taskColumn].map(task => 
+          task.id === editingTask.id ? editingTask : task
+        )
+      }));
+      
+      setShowEditTaskForm(false);
+      setEditingTask(null);
+      showSuccess('Task updated successfully');
+    } catch (err) {
+      console.error('Error updating task:', err);
+      showError('Failed to update task');
+      
+      // Update locally if API fails (for demo)
+      let taskColumn = null;
+      Object.keys(tasks).forEach(column => {
+        if (tasks[column].some(task => task.id === editingTask.id)) {
+          taskColumn = column;
+        }
+      });
+      
+      if (taskColumn) {
+        setTasks(prev => ({
+          ...prev,
+          [taskColumn]: prev[taskColumn].map(task => 
+            task.id === editingTask.id ? editingTask : task
+          )
+        }));
+      }
+      
+      setShowEditTaskForm(false);
+      setEditingTask(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle deleting a task
+  const handleDeleteTask = async (taskId, column) => {
+    const confirmed = window.confirm('Are you sure you want to delete this task?');
+    if (!confirmed) return;
+    
+    try {
+      setLoading(true);
+      
+      // Remove from UI first (optimistic update)
+      setTasks(prev => ({
+        ...prev,
+        [column]: prev[column].filter(task => task.id !== taskId)
+      }));
+      
+      // Delete from backend
+      await axios.delete(`${API_BASE_URL}/api/tasks/${taskId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        withCredentials: true
+      });
+      
+      showSuccess('Task deleted successfully');
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      showError('Failed to delete task');
+      
+      // If API fails, refresh tasks to restore state
+      fetchTasks();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle moving a task between columns via drag and drop
+  const handleDragEnd = async (result) => {
+    const { destination, source, draggableId } = result;
+    
+    // Return if dropped outside a droppable area or in the same position
+    if (!destination || 
+        (destination.droppableId === source.droppableId && 
+         destination.index === source.index)) {
+      return;
+    }
+    
+    // Find the task that was dragged
+    const sourceColumn = source.droppableId;
+    const targetColumn = destination.droppableId;
+    const taskId = draggableId;
+    
+    // Handle the task move with our existing function
+    await handleMoveTask(taskId, sourceColumn, targetColumn);
+  };
+
   // Friends are now managed by state
 
   return (
@@ -1433,14 +1690,14 @@ function Dashboard() {
             </div>
             <div className="p-3">
             <button 
-                onClick={() => handleContentSelection('projects')}
+                onClick={() => handleNavigation('projects')}
                 className={`w-full flex items-center p-3 mb-2 rounded-md transition-colors ${mainContent === 'projects' ? 'bg-[#4D5DFE]/10 text-[#4D5DFE]' : 'hover:bg-[#1E1E29]/60'}`}
             >
-                <FolderOpen size={18} className="mr-3" />
+                <Folder size={18} className="mr-3" />
                 <span>Projects</span>
             </button>
             <button 
-                onClick={() => handleContentSelection('tasks')}
+                onClick={() => handleNavigation('tasks')}
                 className={`w-full flex items-center p-3 mb-2 rounded-md transition-colors ${mainContent === 'tasks' ? 'bg-[#4D5DFE]/10 text-[#4D5DFE]' : 'hover:bg-[#1E1E29]/60'}`}
               >
                 <List size={18} className="mr-3" />
@@ -1452,21 +1709,21 @@ function Dashboard() {
                 <>
                   <div className="mt-4 mb-2 px-3 text-sm text-[#8F8FA3]">Messages</div>
                   <button 
-                    onClick={() => handleContentSelection('messages')}
+                    onClick={() => handleNavigation('messages')}
                     className={`w-full flex items-center p-3 mb-2 rounded-md transition-colors ${mainContent === 'messages' ? 'bg-[#4D5DFE]/10 text-[#4D5DFE]' : 'hover:bg-[#1E1E29]/60'}`}
                   >
                     <MessageSquare size={18} className="mr-3" />
                     <span>Friends</span>
                   </button>
                   <button 
-                    onClick={() => handleContentSelection('findFriends')}
+                    onClick={() => handleNavigation('findFriends')}
                     className={`w-full flex items-center p-3 mb-2 rounded-md transition-colors ${mainContent === 'findFriends' ? 'bg-[#4D5DFE]/10 text-[#4D5DFE]' : 'hover:bg-[#1E1E29]/60'}`}
                   >
                     <UserPlus size={18} className="mr-3" />
                     <span>Find Friends</span>
                   </button>
                   <button 
-                    onClick={() => handleContentSelection('requests')}
+                    onClick={() => handleNavigation('requests')}
                     className={`w-full flex items-center p-3 rounded-md transition-colors ${mainContent === 'requests' ? 'bg-[#4D5DFE]/10 text-[#4D5DFE]' : 'hover:bg-[#1E1E29]/60'}`}
                   >
                     <Bell size={18} className="mr-3" />
@@ -2053,7 +2310,7 @@ function Dashboard() {
                       <h3 className="text-lg font-semibold mb-2">No friends yet</h3>
                       <p className="text-[#8F8FA3] mb-6">Connect with other users to chat and collaborate</p>
                       <button 
-                        onClick={() => handleContentSelection('findFriends')} 
+                        onClick={() => handleNavigation('findFriends')} 
                         className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-4 py-2 rounded-md text-sm transition-colors inline-flex items-center"
                       >
                         <UserPlus size={16} className="mr-2" />
@@ -2221,7 +2478,7 @@ function Dashboard() {
                       className="mr-2 text-[#8F8FA3] hover:text-white"
                       onClick={() => {
                         // Go back to friends list
-                        setMainContent('messages');
+                        handleNavigation('messages');
                         setSelectedFriend(null);
                       }}
                     >
@@ -2319,14 +2576,14 @@ function Dashboard() {
               <p className="text-[#8F8FA3] max-w-md mb-6">Click the menu icon in the top left to access your projects and tasks</p>
               <div className="flex space-x-3">
                 <button 
-                  onClick={() => handleContentSelection('projects')} 
+                  onClick={() => handleNavigation('projects')} 
                   className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-4 py-2 rounded-md flex items-center transition-colors"
                 >
-                  <FolderOpen size={16} className="mr-2" />
+                  <Folder size={16} className="mr-2" />
                   View Projects
                 </button>
                 <button 
-                  onClick={() => handleContentSelection('tasks')} 
+                  onClick={() => handleNavigation('tasks')} 
                   className="bg-[#1E1E29] border border-[#2A2A3A] hover:bg-[#2A2A3A] px-4 py-2 rounded-md flex items-center transition-colors"
                 >
                   <List size={16} className="mr-2" />
@@ -2337,283 +2594,12 @@ function Dashboard() {
           )}
         </div>
         
-        {/* Right Sidebar - Friends list that transforms to chat */}
+        {/* Right Sidebar - Only render for desktop view or when explicitly needed for mobile */}
         {(rightSidebarContent && (!isMobileView || (isMobileView && mainContent === null))) && (
           <div className="w-72 border-l border-[#2A2A3A] bg-[#14141B]/80 backdrop-blur-sm flex flex-col fixed top-16 right-0 bottom-0 transition-all duration-300 ease-in-out z-40">
-            {rightSidebarContent === 'chat' && selectedFriend ? (
-              // Chat room with selected friend
-              <>
-                {/* Chat header */}
-                <div className="p-4 border-b border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm flex items-center">
-                  <button 
-                    className="mr-2 text-[#8F8FA3] hover:text-white"
-                    onClick={() => setRightSidebarContent('friends')}
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <div className="relative">
-                    <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                    <img 
-                      src={selectedFriend.profilePic || selectedFriend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(selectedFriend.userName || selectedFriend.name || 'User')}&background=4D5DFE&color=fff`)} 
-                      alt={selectedFriend.userName || selectedFriend.name || 'User'} 
-                      className="w-10 h-10 rounded-full object-cover relative z-10"
-                    />
-                  </div>
-                  <div className="ml-3 flex-1 truncate">
-                    <h3 className="font-semibold truncate">{selectedFriend.userName || selectedFriend.name || 'Unknown User'}</h3>
-                    <p className="text-xs text-[#8F8FA3]">
-                      {selectedFriend.status || 'Online'}
-                    </p>
-                  </div>
-                </div>
-                
-              {/* Messages area */}
-              <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B]">
-                {loading ? (
-                  <div className="flex justify-center items-center h-32">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-32 text-[#8F8FA3]">
-                    <MessageSquare size={32} className="mb-2 opacity-20" />
-                    <p className="text-sm">No messages yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {messages.map((message, index) => {
-                      const isMyMessage = message.senderId === userId;
-                        return (
-                          <div 
-                          key={message.id || index}
-                          className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[90%] rounded-2xl p-2 ${
-                              isMyMessage 
-                                ? 'bg-[#4D5DFE]/90 text-white rounded-tr-none' 
-                                : 'bg-[#1E1E29]/80 backdrop-blur-sm text-white rounded-tl-none'
-                            } ${message.pending ? 'opacity-70' : ''}`}
-                          >
-                            <p className="text-sm">{message.text}</p>
-                            <p className="text-xs text-right opacity-70">
-                              {typeof message.timestamp === 'object' 
-                                ? message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-                                : new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                              }
-                              {message.pending && ' • Sending...'}
-                              {message.error && ' • Failed to send'}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    <div ref={messagesEndRef} />
-                  </div>
-                )}
-              </div>
-
-              {/* Message input */}
-              <div className="p-3 border-t border-[#2A2A3A] bg-[#14141B]/90 backdrop-blur-sm">
-                <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    className="flex-1 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#4D5DFE] backdrop-blur-sm"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!newMessage.trim() || socketStatus === 'disconnected'}
-                    className="p-2 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Send size={14} />
-                  </button>
-                </form>
-              </div>
-            </>
-          ) : rightSidebarContent === 'users' ? (
-            // Users list for finding friends
-            <>
-              <div className="p-3 border-b border-[#2A2A3A] bg-[#14141B]/90 flex justify-between items-center">
-                <h3 className="font-medium">Find Friends</h3>
-                <div className="flex items-center">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search users..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-40 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md py-1 pl-7 pr-2 text-xs focus:outline-none focus:border-[#4D5DFE]"
-                    />
-                    <Search className="absolute left-2 top-1.5 text-[#8F8FA3]" size={12} />
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {loading ? (
-                  <div className="flex justify-center items-center h-32">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
-                  </div>
-                ) : filteredUsers.length === 0 ? (
-                  <div className="text-center p-6 text-[#8F8FA3]">
-                    <Users className="mx-auto mb-2 opacity-20" size={24} />
-                    <p className="text-sm">No users found</p>
-                  </div>
-                ) : (
-                  <div>
-                    {filteredUsers.map(user => (
-                      <div key={user._id} className="flex items-center justify-between p-3 hover:bg-[#1E1E29]/60">
-                        <div className="flex items-center">
-                          <div className="relative">
-                            <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                            <img 
-                              src={user.profilePic || getImageUrl(`https://ui-avatars.com/api/?name=${user.userName || 'User'}&background=4D5DFE&color=fff`)} 
-                              alt={user.userName || 'User'} 
-                              className="w-8 h-8 rounded-full object-cover relative z-10"
-                            />
-                          </div>
-                          <div className="ml-2 truncate">
-                            <h4 className="font-medium text-sm truncate">{user.userName || 'Unknown User'}</h4>
-                          </div>
-                        </div>
-                        <button 
-                          className="p-1.5 bg-[#4D5DFE]/20 hover:bg-[#4D5DFE]/30 text-[#4D5DFE] rounded-md text-sm transition-colors" 
-                          onClick={() => handleSendFriendRequest(user.id)}
-                        >
-                          <UserPlus size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          ) : rightSidebarContent === 'requests' ? (
-            // Friend requests list
-            <>
-              <div className="p-3 border-b border-[#2A2A3A] bg-[#14141B]/90">
-                <h3 className="font-medium">Friend Requests</h3>
-              </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {loading ? (
-                  <div className="flex justify-center items-center h-32">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
-                  </div>
-                ) : friendRequests.length === 0 ? (
-                  <div className="text-center p-6 text-[#8F8FA3]">
-                    <Bell className="mx-auto mb-2 opacity-20" size={24} />
-                    <p className="text-sm">No friend requests</p>
-                  </div>
-                ) : (
-                  <div>
-                    {friendRequests.map((request, index) => (
-                      <div key={request.id || request._id || index} className="p-3 hover:bg-[#1E1E29]/60">
-                        <div className="flex items-center mb-2">
-                          <div className="relative">
-                            <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                            <img 
-                              src={request.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${request.userName || request.name || 'User'}&background=4D5DFE&color=fff`)} 
-                              alt={request.userName || request.name || 'User'} 
-                              className="w-10 h-10 rounded-full object-cover relative z-10"
-                            />
-                          </div>
-                          <div className="ml-3 truncate">
-                            <h4 className="font-medium truncate">{request.userName || request.name || 'Unknown User'}</h4>
-                            <p className="text-xs text-[#8F8FA3]">
-                              Sent you a request
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleAcceptFriendRequest(request.id)}
-                            className="flex-1 p-1.5 bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white rounded-md text-xs flex items-center justify-center transition-colors"
-                          >
-                            <Check size={12} className="mr-1" />
-                            Accept
-                          </button>
-                          <button
-                            onClick={() => handleRejectFriendRequest(request.id)}
-                            className="flex-1 p-1.5 bg-[#E94560]/10 hover:bg-[#E94560]/20 text-[#E94560] rounded-md text-xs flex items-center justify-center transition-colors"
-                          >
-                            <X size={12} className="mr-1" />
-                            Decline
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            // Default Friends list (Messages)
-            <>
-              <div className="p-3 border-b border-[#2A2A3A] bg-[#14141B]/90 flex justify-between items-center">
-                <h3 className="font-medium">Messages</h3>
-                <div className="relative">
-              <input
-                type="text"
-                    placeholder="Search friends..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-32 bg-[#1E1E29]/80 border border-[#2A2A3A] rounded-md py-1 pl-7 pr-2 text-xs focus:outline-none focus:border-[#4D5DFE]"
-                  />
-                  <Search className="absolute left-2 top-1.5 text-[#8F8FA3]" size={12} />
-            </div>
-            </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {loading ? (
-                  <div className="flex justify-center items-center h-32">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
+            {/* Right sidebar content */}
           </div>
-                ) : friends.length === 0 ? (
-                  <div className="text-center p-6 text-[#8F8FA3]">
-                    <Users className="mx-auto mb-2 opacity-20" size={24} />
-                    <p className="text-sm">No friends yet</p>
-                <button 
-                      onClick={() => setRightSidebarContent('users')} 
-                      className="mt-2 text-[#4D5DFE] text-xs flex items-center mx-auto"
-                >
-                      <UserPlus size={12} className="mr-1" />
-                      Add Friends
-                </button>
-                  </div>
-                ) : (
-                  <div>
-                    {friends
-                      .filter(friend => 
-                        (friend.userName?.toLowerCase() || friend.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-                      )
-                      .map(friend => (
-                        <div 
-                          key={friend._id || friend.id} 
-                          className="flex items-center p-3 hover:bg-[#1E1E29]/60 cursor-pointer transition-colors"
-                          onClick={() => handleSelectFriend(friend)}
-                        >
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full bg-[#4D5DFE]/10 blur-sm"></div>
-                  <img 
-                              src={friend.profilePic || friend.avatar || getImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(friend.userName || friend.name || 'User')}&background=4D5DFE&color=fff`)}
-                              alt={friend.userName || friend.name || 'User'} 
-                    className="w-10 h-10 rounded-full object-cover relative z-10"
-                  />
-                </div>
-                          <div className="ml-3 truncate">
-                            <h4 className="font-medium truncate">{friend.userName || friend.name || 'Unknown User'}</h4>
-                            <p className="text-xs text-[#8F8FA3] truncate">
-                              {friend.status || 'Online'}
-                  </p>
-                </div>
-      </div>
-                      ))}
-                  </div>
-                )}
-            </div>
-            </>
         )}
-        </div>
       </div>
     </div>
   );
