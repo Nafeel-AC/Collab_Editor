@@ -83,14 +83,14 @@ const WelcomePage = () => {
             Our collaborative editor makes team coding seamless and efficient.
           </p>
           
-          {/* Call to action buttons with moving borders */}
-          <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+          {/* Call to action buttons with moving borders - now side by side on all screen sizes */}
+          <div className="flex flex-row justify-center space-x-4 mx-auto max-w-xs md:max-w-md">
             <Button
               as={Link}
               to="/LoginPage"
-              containerClassName="w-40 h-12 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-cyan-500/40"
+              containerClassName="flex-1 h-12 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-cyan-500/40"
               borderClassName="bg-[radial-gradient(#06b6d4_40%,transparent_60%)] opacity-90"
-              className="bg-black/30 border-cyan-500/30 text-white font-semibold"
+              className="bg-black/30 border-cyan-500/30 text-white font-semibold text-sm md:text-base w-full"
               duration={2000}
             >
               Login
@@ -99,9 +99,9 @@ const WelcomePage = () => {
             <Button
               as={Link}
               to="/SignupPage"
-              containerClassName="w-40 h-12 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/40"
+              containerClassName="flex-1 h-12 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/40"
               borderClassName="bg-[radial-gradient(#a855f7_40%,transparent_60%)] opacity-90"
-              className="bg-black/30 border-purple-500/30 text-white font-semibold"
+              className="bg-black/30 border-purple-500/30 text-white font-semibold text-sm md:text-base w-full"
               duration={3000}
             >
               Sign Up
