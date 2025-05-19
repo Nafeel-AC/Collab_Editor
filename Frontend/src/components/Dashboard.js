@@ -66,6 +66,7 @@ function Dashboard() {
   const [friendRequests, setFriendRequests] = useState([]);
   const [activeTab, setActiveTab] = useState('friends'); // 'friends', 'users', 'requests'
   const [loading, setLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false); // Separate loading state for messages
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
@@ -135,13 +136,20 @@ function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Add useEffect to fetch tasks and projects when component mounts
+  // Add useEffect to fetch tasks and projects when component mounts or main content changes
   useEffect(() => {
     if (isAuthenticated && token) {
-      fetchProjects();
-      fetchTasks(); // Fetch tasks when component mounts
+      // Only fetch if main content is projects or tasks
+      if (mainContent === 'projects') {
+        console.log('Fetching projects for projects view');
+        fetchProjects();
+      }
+      if (mainContent === 'tasks') {
+        console.log('Fetching tasks for tasks view');
+        fetchTasks();
+      }
     }
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, mainContent]); // Only depend on authentication and mainContent changes
 
   // Apply dark mode with bluish glow effects
   useEffect(() => {
@@ -986,10 +994,11 @@ function Dashboard() {
     } else {
       // For desktop: Use the right sidebar for chat
       setRightSidebarContent('chat');
-      // Don't change the main content when selecting a friend on desktop
+      // Important: Do NOT change mainContent in desktop view to prevent projects/tasks reloading
+      // mainContent stays as is (either 'projects', 'tasks', etc.)
     }
     
-    // Fetch messages for the selected friend
+    // Fetch messages for the selected friend - uses separate messagesLoading state
     fetchMessages(friend._id || friend.id);
   };
 
@@ -1005,7 +1014,7 @@ function Dashboard() {
     
     const attemptFetch = async () => {
       try {
-        setLoading(true);
+        setMessagesLoading(true); // Use message-specific loading state
         console.log(`Fetching messages for friend ID: ${friendId}`);
         
         const response = await fetch(`${API_BASE_URL}/api/messages/${friendId}`, {
@@ -1019,9 +1028,30 @@ function Dashboard() {
         if (response.ok) {
           const messagesData = await response.json();
           
-          // Sort messages by timestamp
-          const sortedMessages = messagesData.sort((a, b) => 
-            new Date(a.createdAt) - new Date(b.createdAt)
+          // Process messages to ensure valid timestamps
+          const processedMessages = messagesData.map(msg => {
+            // Safely create date objects
+            let timestamp = null;
+            try {
+              timestamp = new Date(msg.createdAt || msg.timestamp || Date.now());
+              // Verify it's a valid date
+              if (isNaN(timestamp.getTime())) {
+                timestamp = new Date(); // Fallback to current time if invalid
+              }
+            } catch (e) {
+              console.error('Error parsing message timestamp:', e);
+              timestamp = new Date(); // Fallback to current time
+            }
+            
+            return {
+              ...msg,
+              parsedTimestamp: timestamp // Add a reliable timestamp field
+            };
+          });
+          
+          // Sort messages by the validated timestamp
+          const sortedMessages = processedMessages.sort((a, b) => 
+            a.parsedTimestamp - b.parsedTimestamp
           );
           
           console.log(`Fetched ${sortedMessages.length} messages with ${friendId}`);
@@ -1057,7 +1087,7 @@ function Dashboard() {
           setError('Failed to load messages. Please try again later.');
         }
       } finally {
-        setLoading(false);
+        setMessagesLoading(false); // Use message-specific loading state
         
         // Scroll to bottom of messages
         setTimeout(() => {
@@ -1248,14 +1278,13 @@ function Dashboard() {
 
   // Handle navigation to Projects or Tasks page
   const handleNavigation = (destination) => {
-    setShowLeftSidebar(false);
     setMainContent(destination);
     
-    if (destination === 'projects') {
-      fetchProjects();
-    } else if (destination === 'tasks') {
-      fetchTasks();
-    } else if (isMobileView) {
+    // Mobile specific behavior for sidebar
+    if (isMobileView) {
+      // Close sidebar when navigating in mobile view
+      setShowLeftSidebar(false);
+      
       // For mobile view, handle messages-related content in main area
       if (destination === 'messages') {
         setRightSidebarContent('friends');
@@ -1264,6 +1293,15 @@ function Dashboard() {
       } else if (destination === 'requests') {
         setRightSidebarContent('requests');
       }
+    }
+    
+    // Reset search terms when changing sections
+    if (destination === 'projects') {
+      setProjectSearchTerm('');
+    } else if (destination === 'tasks') {
+      setSearchTerm('');
+    } else if (destination === 'messages') {
+      setFriendSearchTerm('');
     }
   };
 
@@ -2643,8 +2681,8 @@ function Dashboard() {
                   </div>
 
                   {/* Messages area */}
-                  <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B] border-l border-r border-[#2A2A3A]">
-                    {loading ? (
+                  <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B]">
+                    {messagesLoading ? (
                       <div className="flex justify-center items-center h-32">
                         <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
                       </div>
@@ -2671,10 +2709,23 @@ function Dashboard() {
                               >
                                 <p className="text-sm">{message.text}</p>
                                 <p className="text-xs text-right opacity-70">
-                                  {typeof message.timestamp === 'object' 
-                                    ? message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-                                    : new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                                  }
+                                  {(() => {
+                                    try {
+                                      const dateObj = typeof message.timestamp === 'object' 
+                                        ? message.timestamp 
+                                        : new Date(message.timestamp || message.createdAt);
+                                      
+                                      // Add explicit check for invalid date
+                                      if (!dateObj || isNaN(dateObj.getTime())) {
+                                        return 'Just now';
+                                      }
+                                      
+                                      return dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                    } catch (e) {
+                                      console.error('Error parsing message timestamp:', e);
+                                      return 'Just now';
+                                    }
+                                  })()}
                                   {message.pending && ' • Sending...'}
                                   {message.error && ' • Failed to send'}
                                 </p>
@@ -2771,7 +2822,7 @@ function Dashboard() {
                 
                 {/* Messages area */}
                 <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-gradient-to-b from-[#0F0F13] to-[#14141B]">
-                  {loading ? (
+                  {messagesLoading ? (
                     <div className="flex justify-center items-center h-32">
                       <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#4D5DFE]"></div>
                     </div>
@@ -2798,10 +2849,23 @@ function Dashboard() {
                             >
                               <p className="text-sm">{message.text}</p>
                               <p className="text-xs text-right opacity-70">
-                                {typeof message.timestamp === 'object' 
-                                  ? message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-                                  : new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                                }
+                                {(() => {
+                                  try {
+                                    const dateObj = typeof message.timestamp === 'object' 
+                                      ? message.timestamp 
+                                      : new Date(message.timestamp || message.createdAt);
+                                    
+                                    // Add explicit check for invalid date
+                                    if (!dateObj || isNaN(dateObj.getTime())) {
+                                      return 'Just now';
+                                    }
+                                    
+                                    return dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                  } catch (e) {
+                                    console.error('Error parsing message timestamp:', e);
+                                    return 'Just now';
+                                  }
+                                })()}
                                 {message.pending && ' • Sending...'}
                                 {message.error && ' • Failed to send'}
                               </p>
