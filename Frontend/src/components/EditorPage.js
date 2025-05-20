@@ -12,7 +12,7 @@ import { css } from '@codemirror/lang-css';
 import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import { githubDark } from '@uiw/codemirror-theme-github';
-import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle, FileText, Terminal, Code, Menu, Play, RefreshCw, MessageSquare, Send, ChevronLeft, UserPlus, Bell, Search } from 'lucide-react';
+import { Users, ChevronDown, ChevronUp, Share2, X, AlertCircle, FileText, Terminal, Code, Menu, Play, RefreshCw, MessageSquare, Send, ChevronLeft, UserPlus, Bell, Search, Folder } from 'lucide-react';
 import axios from 'axios';
 import { AnimatedTooltip } from './ui/animated-tooltip';
 
@@ -27,8 +27,8 @@ const EditorPage = () => {
   const navigate = useNavigate();
   
   // Extract project info from location state
-  const projectId = location.state?.projectId || location.state?.originalProjectId;
-  const isExistingProject = !!projectId || location.state?.isExistingProject;
+  const projectId = location.state?.projectId;
+  const isExistingProject = location.state?.isExistingProject;
   
   const [code, setCode] = useState('// Start coding here');
   const [language, setLanguage] = useState('javascript');
@@ -77,6 +77,9 @@ const EditorPage = () => {
   
   // Add state for mobile header dropdown
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
+  
+  // Add a ref to track the current active tab
+  const activeTabRef = useRef('editor');
   
   // Store username in localStorage for persistence
   useEffect(() => {
@@ -582,6 +585,31 @@ const EditorPage = () => {
           }}
         />
         
+        {/* File Explorer Toggle Button with direct DOM manipulation as fallback */}
+        <button 
+          onClick={() => {
+            console.log('Explorer button clicked!');
+            // Update ref first for immediate effect
+            activeTabRef.current = 'explorer';
+            // Then update state
+            setActiveTab('explorer');
+            setShowExplorer(true);
+            
+            // Force render by directly manipulating DOM as a last resort
+            const explorerContent = document.getElementById('mobile-explorer-content');
+            if (explorerContent) {
+              console.log('Directly showing explorer via DOM');
+              explorerContent.style.display = 'block';
+              explorerContent.style.zIndex = '9999';
+            }
+          }}
+          className="absolute bottom-20 right-4 bg-red-600 hover:bg-red-500 text-white p-3 rounded-full shadow-lg z-50"
+          aria-label="Toggle File Explorer"
+          style={{ zIndex: 9999 }}
+        >
+          <FileText size={20} />
+        </button>
+        
         {/* Sticky Run Button */}
         <button 
           onClick={() => {
@@ -619,20 +647,24 @@ const EditorPage = () => {
   
   // Function to render the current tab content on mobile
   const renderMobileTabContent = () => {
+    console.log('Rendering mobile tab content for tab:', activeTab);
+    
     switch (activeTab) {
       case 'editor':
         return renderMobileEditorContent();
       case 'explorer':
         return (
+          <div className="h-full overflow-auto bg-[#14141B]">
           <FileExplorer 
             roomId={roomId}
             onFileSelect={(file) => {
               handleFileSelect(file);
-              setActiveTab('editor'); // Switch back to editor after selecting a file
+                handleTabChange('editor'); // Use handleTabChange to avoid setState loops
             }}
             selectedFile={selectedFile}
             initialFiles={isExistingProject ? projectFiles : undefined}
           />
+          </div>
         );
       default:
         return renderMobileEditorContent();
@@ -706,37 +738,18 @@ const EditorPage = () => {
   // Function to update a file's content in the backend
   const updateFileContent = async (fileId, content) => {
     try {
-      console.log(`Updating file content for file ID: ${fileId}, content length: ${content.length}`);
-      
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('No authentication token found');
-        return false;
-      }
-      
-      // Make sure we have all required parameters
-      if (!fileId || !roomId) {
-        console.error('Missing required parameters for file update', { fileId, roomId });
-        return false;
-      }
-      
-      const response = await axios.put(`${API_BASE_URL}/api/files/${fileId}`, {
+      await axios.put(`${API_BASE_URL}/api/files/${fileId}`, {
         content,
-        roomId,
-        updatedBy: username
+        roomId
       }, {
         headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${localStorage.getItem('token')}`
         }
       });
       
-      console.log('File content updated in backend', response.data);
-      return true;
+      console.log('File content updated in backend');
     } catch (error) {
-      console.error('Error updating file content:', error.response?.data || error.message || error);
-      // Don't throw the error, just return false to indicate failure
-      return false;
+      console.error('Error updating  content:', error);
     }
   };
   
@@ -801,51 +814,242 @@ const EditorPage = () => {
     
     // Only proceed if confirmed
     if (isConfirmed) {
-      // If this is an existing project, save it directly without showing the modal
+      // Check if this is an existing project
       if (isExistingProject && projectId) {
-        await handleSaveProject(true);
-      } else {
-        // Show save project modal for new projects
+        // Directly save the existing project without showing modal
+        await updateExistingProject('closeAfterSave');
+          } else {
+        // For new projects, show save project modal
         setShowSaveModal(true);
       }
     }
   };
   
-  // Function to handle project save
-  const handleSaveProject = async (isExistingProjectSave = false) => {
-    // For existing projects, if projectName is not set, fetch it first
-    if (isExistingProjectSave && isExistingProject && projectId && !projectName.trim()) {
-      try {
-        // Get authentication token
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.error('No authentication token found');
-          return;
+  // Function to get room creator information
+  const getRoomInfo = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const roomResponse = await axios.get(`${API_BASE_URL}/api/rooms/${roomId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (roomResponse.data && roomResponse.data.room) {
+        const roomData = roomResponse.data.room;
+        console.log('Room info:', roomData);
+        return roomData;
+      }
+    } catch (error) {
+      console.error('Failed to fetch room details:', error);
+    }
+    return null;
+  };
+
+  // Function to ensure at least one file exists in the room
+  const ensureRoomHasFiles = async () => {
+    try {
+      console.log('Checking if room has files...');
+      const token = localStorage.getItem('token');
+      
+      // First, check if any files exist for this room
+      const filesResponse = await axios.get(`${API_BASE_URL}/api/files/room/${roomId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      const existingFiles = filesResponse.data.files || [];
+      console.log(`Found ${existingFiles.length} files for room ${roomId}`);
+      
+      // If no files exist, create a default file
+      if (existingFiles.length === 0) {
+        console.log('No files found. Creating a default file...');
+        
+        // Get current editor content
+        const defaultContent = code || '// Start coding here';
+        
+        // Generate a suitable filename based on the language
+        let defaultFileName;
+        switch (language) {
+          case 'javascript':
+            defaultFileName = 'main.js';
+            break;
+          case 'python':
+            defaultFileName = 'main.py';
+            break;
+          case 'java':
+            defaultFileName = 'Main.java';
+            break;
+          case 'cpp':
+            defaultFileName = 'main.cpp';
+            break;
+          case 'html':
+            defaultFileName = 'index.html';
+            break;
+          case 'css':
+            defaultFileName = 'styles.css';
+            break;
+          default:
+            defaultFileName = 'main.js';
         }
         
-        // Fetch project details to get the name
-        const response = await axios.get(`${API_BASE_URL}/api/projects/${projectId}`, {
+        // Create a default file
+        const createResponse = await axios.post(`${API_BASE_URL}/api/files/create`, {
+          roomId,
+          name: defaultFileName,
+          type: 'file',
+          path: `/${defaultFileName}`,
+          content: defaultContent,
+          language,
+          createdBy: username
+        }, {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         });
         
-        if (response.data && response.data.project && response.data.project.name) {
-          setProjectName(response.data.project.name);
-          setProjectDescription(response.data.project.description || '');
-        } else {
-          alert('Could not retrieve project information');
-          return;
+        console.log('Created default file:', createResponse.data);
+        
+        // Set the created file as selected
+        if (createResponse.data.file) {
+          setSelectedFile(createResponse.data.file);
+          return [createResponse.data.file];
         }
-      } catch (error) {
-        console.error('Error fetching project data:', error);
-        alert(`Error retrieving project data: ${error.response?.data?.message || error.message}`);
-        return;
       }
+      
+      return existingFiles;
+    } catch (error) {
+      console.error('Error ensuring room has files:', error);
+      
+      // Show error message
+      alert(`Error ensuring room has files: ${error.response?.data?.message || error.message}`);
+      throw error;
     }
+  };
+
+  // Function to update an existing project
+  const updateExistingProject = async (closeAfterSave) => {
+    setIsSaving(true);
     
-    // If it's a new project, validate the name
-    if (!isExistingProjectSave && !projectName.trim()) {
+    try {
+      // Make sure room has at least one file
+      const files = await ensureRoomHasFiles();
+      console.log('Files available for save:', files);
+      
+      // Save the current code to the selected file if any
+      if (selectedFile) {
+        await updateFileContent(selectedFile._id, code);
+        console.log('Saved current editor content to', selectedFile.name);
+      }
+      
+      // Get fresh file list to ensure we have the latest files
+      const token = localStorage.getItem('token');
+      const freshFilesResponse = await axios.get(`${API_BASE_URL}/api/files/room/${roomId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      const currentFiles = freshFilesResponse.data.files || [];
+      console.log(`Got ${currentFiles.length} files for room ${roomId} to include in project`);
+      
+      // Get file IDs to include in the project
+      const fileIds = currentFiles.map(file => file._id);
+      
+      // Debug information about user
+      console.log('Current username:', username);
+      console.log('Username from localStorage:', localStorage.getItem('userName'));
+      
+      // Try to get room info to check creator
+      let creatorName = username;
+      const roomInfo = await getRoomInfo();
+      if (roomInfo && roomInfo.createdBy) {
+        console.log('Room was created by:', roomInfo.createdBy);
+        creatorName = roomInfo.createdBy;
+      }
+      
+      // Ensure we have a project name
+      let nameToUse = projectName;
+      let descriptionToUse = projectDescription;
+      
+      // If project name is missing, try to fetch it again
+      if (!nameToUse && projectId) {
+        console.log('Project name missing, fetching from server');
+        try {
+          const token = localStorage.getItem('token');
+          const projectResponse = await axios.get(`${API_BASE_URL}/api/projects/${projectId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          
+          if (projectResponse.data && projectResponse.data.project) {
+            nameToUse = projectResponse.data.project.name;
+            descriptionToUse = projectResponse.data.project.description || descriptionToUse;
+            
+            // Update state for future saves
+            setProjectName(nameToUse);
+            setProjectDescription(descriptionToUse);
+            
+            console.log('Retrieved project name:', nameToUse);
+          }
+        } catch (fetchError) {
+          console.error('Failed to fetch project details:', fetchError);
+        }
+      }
+      
+      // Final validation - don't proceed without a name
+      if (!nameToUse) {
+        throw new Error('Project name is required and could not be retrieved');
+      }
+      
+      // Update project in backend
+      const response = await axios.post(`${API_BASE_URL}/api/projects/save/${roomId}`, {
+        name: nameToUse,
+        description: descriptionToUse,
+        projectId: projectId, // Send the projectId to explicitly identify the project to update
+        createdBy: creatorName, // Use the actual room creator name
+        originalUsername: username, // Alternative field that might be used by backend
+        userId: localStorage.getItem('userId'), // Include userId for additional verification
+        fileIds: fileIds // Explicitly provide file IDs to include in the project
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      console.log('Project updated:', response.data);
+      
+      setIsSaving(false);
+      
+      // Notify all users in the room that it's being closed after saving
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('close-room', {
+            roomId,
+            username,
+          savedProject: true
+        });
+      }
+      
+      // Show success message
+      alert('Project updated successfully!');
+      
+      // Continue with room closure if this was called from closeRoom
+      if (closeAfterSave) {
+        await finishRoomClose();
+      }
+    } catch (error) {
+      console.error('Error updating project:', error);
+      setIsSaving(false);
+      alert(`Error updating project: ${error.response?.data?.message || error.message}`);
+    }
+  };
+  
+  // Function to handle project save
+  const handleSaveProject = async () => {
+    if (!projectName.trim()) {
       alert('Please enter a project name');
       return;
     }
@@ -853,48 +1057,38 @@ const EditorPage = () => {
     setIsSaving(true);
     
     try {
+      // Make sure room has at least one file
+      const files = await ensureRoomHasFiles();
+      console.log('Files available for save:', files);
+      
       // Save the current code to the selected file if any
-      let fileUpdateSuccess = true;
       if (selectedFile) {
-        fileUpdateSuccess = await updateFileContent(selectedFile._id, code);
+        await updateFileContent(selectedFile._id, code);
+        console.log('Saved current editor content to', selectedFile.name);
       }
       
-      if (!fileUpdateSuccess) {
-        console.warn('File content update failed, but continuing with project save');
-      }
-      
-      console.log('Saving project with the following data:', {
-        roomId,
-        projectName: projectName || (isExistingProject ? 'Untitled Project' : ''),
-        username,
-        isExistingProject,
-        projectId
+      // Get fresh file list to ensure we have the latest files
+      const token = localStorage.getItem('token');
+      const freshFilesResponse = await axios.get(`${API_BASE_URL}/api/files/room/${roomId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
       
-      // Create or update project in backend
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
+      const currentFiles = freshFilesResponse.data.files || [];
+      console.log(`Got ${currentFiles.length} files for room ${roomId} to include in project`);
       
-      // Check if we have an original project ID in the room state
+      // Get file IDs to include in the project
+      const fileIds = currentFiles.map(file => file._id);
+      
+      // Create project in backend
       const response = await axios.post(`${API_BASE_URL}/api/projects/save/${roomId}`, {
-        name: projectName || (isExistingProject ? 'Untitled Project' : ''),
+        name: projectName,
         description: projectDescription,
-        // Pass projectId for existing projects
-        projectId: projectId,
-        // Include the username as creator
-        createdBy: username,
-        // Add room information to help debug permission issues
-        roomData: {
-          fromOriginalProject: isExistingProject,
-          originalProjectId: location.state?.originalProjectId,
-          projectId: location.state?.projectId
-        }
+        fileIds: fileIds // Explicitly provide file IDs
       }, {
         headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${localStorage.getItem('token')}`
         }
       });
       
@@ -918,21 +1112,359 @@ const EditorPage = () => {
       // Continue with room closure if applicable
       await finishRoomClose();
     } catch (error) {
-      console.error('Error saving project:', error.response?.data || error.message || error);
+      console.error('Error saving project:', error);
       setIsSaving(false);
-      
-      // Provide more specific error messages based on status codes
-      if (error.response) {
-        if (error.response.status === 403) {
-          alert(`Permission denied: You don't have permission to save this project. Only the room creator can save it.`);
-        } else if (error.response.status === 400) {
-          alert(`Error saving project: ${error.response.data?.message || 'Invalid request data'}`);
-        } else {
-          alert(`Error saving project: ${error.response.data?.message || error.message || 'Unknown error'}`);
-        }
+      alert(`Error saving project: ${error.response?.data?.message || error.message}`);
+    }
+  };
+  
+  // Function to cancel project save (just close the modal)
+  const cancelSaveProject = () => {
+    setShowSaveModal(false);
+  };
+  
+  // Function to finish room closure process
+  const finishRoomClose = async () => {
+    try {
+      // Only attempt to delete the room if it's a newly created room
+      // If it's an existing project opened from the dashboard, just navigate away
+      if (!location.state?.isExistingProject) {
+        // Clean up on server
+        await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        console.log('Room closed successfully');
       } else {
-        alert(`Error saving project: ${error.message || 'Connection error'}`);
+        console.log('Navigating away from existing project without deleting room');
       }
+      
+      // Clean up socket
+      if (socketRef.current) {
+        if (socketRef.current.connected) {
+      socketRef.current.emit('leave-room', { roomId });
+        }
+        socketRef.current.disconnect();
+      }
+      
+      // Navigate to dashboard
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error closing room:', error);
+      
+      // Even if there's an error, still navigate away
+      navigate('/dashboard');
+    }
+  };
+  
+  // Function to handle beforeunload event
+    const handleBeforeUnload = async (e) => {
+    // Show a confirmation dialog to the user
+    const message = 'Are you sure you want to leave? Any unsaved changes will be lost.';
+    e.returnValue = message;
+    
+    return message;
+  };
+  
+  // Function to check if we're on mobile
+  const isMobile = () => window.innerWidth < 768;
+
+  // Add resize listener to update view on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (!isMobile()) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial check
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
+  // Load project data if this is an existing project
+  useEffect(() => {
+    // If this is an existing project, fetch the project data
+    if (isExistingProject && projectId) {
+      console.log(`Loading existing project (ID: ${projectId}) into room: ${roomId}`);
+      fetchProjectData(projectId);
+      
+      // Update document title to show it's an existing project
+      document.title = `Loading project... - ${roomId}`;
+    } else {
+      document.title = `Collaborative Editor - ${roomId}`;
+    }
+  }, [projectId, isExistingProject, roomId]);
+  
+  // Function to fetch project data
+  const fetchProjectData = async (projectId) => {
+    try {
+      setIsLoadingProject(true);
+      
+      // Get authentication token
+          const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+      
+      console.log(`Fetching project data for project ID: ${projectId}`);
+      
+      // Fetch project details
+      const response = await axios.get(`${API_BASE_URL}/api/projects/${projectId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (response.data) {
+        console.log('Project data loaded:', response.data);
+        
+        // Store project info
+        const projectData = response.data.project || response.data;
+        const projectName = projectData.name || '';
+        const projectDesc = projectData.description || '';
+        
+        console.log(`Setting project name: "${projectName}" and description`);
+        
+        setProjectName(projectName);
+        setProjectDescription(projectDesc);
+        document.title = `${projectName || 'Project'} - ${roomId}`;
+        
+        // Load files from project
+        if (response.data.files && Array.isArray(response.data.files)) {
+          const projectFiles = response.data.files;
+          console.log(`Project files found: ${projectFiles.length}`);
+          
+          // Normalize all file paths first
+          const normalizedFiles = projectFiles.map(file => {
+            // Ensure consistent path format (with leading slash)
+            const normalizedPath = file.path ? 
+              (file.path.startsWith('/') ? file.path : `/${file.path}`) : 
+              `/${file.name}`;
+              
+            return {
+              ...file,
+              path: normalizedPath
+            };
+          });
+          
+          // Track which folder paths we need to create from file paths
+          const folderPaths = new Set();
+          const existingFolders = new Set();
+          
+          // First, identify all folder paths that need to exist
+          normalizedFiles.forEach(file => {
+            if (file.type === 'folder') {
+              existingFolders.add(file.path);
+            } else if (file.path.includes('/')) {
+              // Extract the folder path from the file path
+              let pathParts = file.path.split('/').filter(Boolean);
+              
+              // Skip if file is at root level
+              if (pathParts.length <= 1) return;
+              
+              // Create folder paths for each level
+              let currentPath = '';
+              for (let i = 0; i < pathParts.length - 1; i++) {
+                currentPath = currentPath ? `${currentPath}/${pathParts[i]}` : `/${pathParts[i]}`;
+                folderPaths.add(currentPath);
+              }
+            }
+          });
+          
+          console.log('Existing folders:', Array.from(existingFolders));
+          console.log('Required folder paths:', Array.from(folderPaths));
+          
+          // Create folder objects for missing folders
+          const syntheticFolders = [];
+          
+          // Process folder paths in order of depth (parents first)
+          Array.from(folderPaths)
+            .sort((a, b) => a.split('/').filter(Boolean).length - b.split('/').filter(Boolean).length)
+            .forEach(folderPath => {
+              // Only create if this folder doesn't exist already
+              if (!existingFolders.has(folderPath)) {
+                const folderName = folderPath.split('/').filter(Boolean).pop();
+                
+                // Create a synthetic folder object
+                const folderObj = {
+                  _id: `folder_${folderPath.replace(/\//g, '_')}_${Date.now()}${Math.random().toString(36).substring(2, 9)}`,
+                  name: folderName,
+                  type: 'folder',
+                  path: folderPath,
+                  content: '',
+                  synthetic: true, // Mark as synthetic
+                  createdAt: new Date().toISOString()
+                };
+                
+                // Find parent folder if this is not a root folder
+                if (folderPath.split('/').filter(Boolean).length > 1) {
+                  const parentPath = folderPath.substring(0, folderPath.lastIndexOf('/'));
+                  
+                  // Look for parent either in existing folders or already created synthetic folders
+                  const existingParent = normalizedFiles.find(f => f.type === 'folder' && f.path === parentPath);
+                  const syntheticParent = syntheticFolders.find(f => f.path === parentPath);
+                  const parent = existingParent || syntheticParent;
+                  
+                  if (parent) {
+                    folderObj.parentId = parent._id;
+                    console.log(`Setting parent for folder ${folderName}: ${parent.name} (${parent._id})`);
+                  }
+                }
+                
+                syntheticFolders.push(folderObj);
+                existingFolders.add(folderPath); // Mark as existing for subsequent folders
+                console.log(`Created synthetic folder: ${folderName} with path ${folderPath}`);
+              }
+            });
+          
+          // Combine original files with synthetic folders
+          const combinedFiles = [...normalizedFiles, ...syntheticFolders];
+          
+          // Create a map for easy folder lookup by path
+          const folderByPath = {};
+          combinedFiles.forEach(file => {
+            if (file.type === 'folder') {
+              folderByPath[file.path] = file;
+            }
+          });
+          
+          // Set up parent-child relationships for all files
+          const processedFiles = combinedFiles.map(file => {
+            const result = {...file}; // Create a copy to avoid modifying the original
+            
+            // Skip if it's a folder that already has a parentId
+            if (file.type === 'folder' && file.parentId) return result;
+            
+            // If file has a path but no parentId, try to find the parent
+            if (file.path && file.path.includes('/')) {
+              const pathParts = file.path.split('/').filter(Boolean);
+              
+              // Skip if file is at root level
+              if (pathParts.length <= 1) return result;
+              
+              // Get the parent path
+              const parentPath = file.path.substring(0, file.path.lastIndexOf('/'));
+              
+              // Find the parent folder
+              const parentFolder = folderByPath[parentPath];
+              
+              if (parentFolder && !result.parentId) {
+                result.parentId = parentFolder._id;
+                console.log(`Assigned parent for ${file.name}: ${parentFolder.name} (${parentFolder._id})`);
+              }
+            }
+            
+            return result;
+          });
+          
+          // Log each file for debugging
+          processedFiles.forEach(file => {
+            console.log(`Project file: ${file.name}, path: ${file.path}, type: ${file.type}, parentId: ${file.parentId || 'none'}, synthetic: ${file.synthetic || false}`);
+          });
+          
+          setProjectFiles(processedFiles);
+          
+          // If there are files, select the first one to display in the editor
+          if (processedFiles.length > 0) {
+            // Sort files to prioritize common entry files
+            const sortedFiles = [...processedFiles].sort((a, b) => {
+              // Prioritize main entry files
+              const isMainA = a.name.includes('main') || a.name.includes('index');
+              const isMainB = b.name.includes('main') || b.name.includes('index');
+              
+              if (isMainA && !isMainB) return -1;
+              if (!isMainA && isMainB) return 1;
+              
+              // Then prioritize by type (files before folders)
+              if (a.type !== b.type) {
+                return a.type === 'file' ? -1 : 1;
+              }
+              
+              // Otherwise sort alphabetically
+              return a.name.localeCompare(b.name);
+            });
+            
+            // Find the first actual file (not folder)
+            const mainFile = sortedFiles.find(file => file.type === 'file');
+            
+            if (mainFile) {
+            console.log('Setting main file:', mainFile);
+            setSelectedFile(mainFile);
+            setCode(mainFile.content || '// Start coding here');
+            
+            // If we have a language extension, set the editor language
+            if (mainFile.name) {
+              const extension = mainFile.name.split('.').pop().toLowerCase();
+              switch (extension) {
+                case 'js':
+                  setLanguage('javascript');
+                  break;
+                case 'py':
+                  setLanguage('python');
+                  break;
+                case 'java':
+                  setLanguage('java');
+                  break;
+                case 'cpp':
+                case 'c':
+                  setLanguage('cpp');
+                  break;
+                case 'html':
+                  setLanguage('html');
+                  break;
+                case 'css':
+                  setLanguage('css');
+                  break;
+                case 'json':
+                  setLanguage('json');
+                  break;
+                case 'md':
+                  setLanguage('markdown');
+                  break;
+                default:
+                  // Keep default language
+                  break;
+              }
+            }
+            } else {
+              console.warn('No files found in project response, will create default file');
+              // If no files found, ensure we create one
+              setTimeout(() => {
+                ensureRoomHasFiles();
+              }, 1000);
+            }
+          } else {
+            console.warn('No files found in project response, will create default file');
+            // If no files found, ensure we create one
+            setTimeout(() => {
+              ensureRoomHasFiles();
+            }, 1000);
+          }
+        } else {
+          console.warn('No files array in project response, will create default file');
+          // If no files array found, ensure we create one
+          setTimeout(() => {
+            ensureRoomHasFiles();
+          }, 1000);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching project data:', error);
+      alert(`Error loading project: ${error.response?.data?.message || error.message}`);
+      
+      // On error, create a default file
+      setTimeout(() => {
+        ensureRoomHasFiles();
+      }, 1000);
+    } finally {
+      setIsLoadingProject(false);
     }
   };
   
@@ -1545,179 +2077,63 @@ const EditorPage = () => {
     };
   }, [socketRef.current]);
   
-  // Function to cancel project save (just close the modal)
-  const cancelSaveProject = () => {
-    setShowSaveModal(false);
-  };
-  
-  // Function to finish room closure process
-  const finishRoomClose = async () => {
-    try {
-      // Only attempt to delete the room if it's a newly created room
-      // If it's an existing project opened from the dashboard, just navigate away
-      if (!isExistingProject && !projectId) {
-        console.log('Cleaning up room as this is not an existing project');
-        // Clean up on server
-        await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        
-        console.log('Room closed successfully');
-      } else {
-        console.log('Navigating away from existing project without deleting room');
-      }
-      
-      // Clean up socket
-      if (socketRef.current) {
-        if (socketRef.current.connected) {
-          console.log(`Leaving room: ${roomId}`);
-          socketRef.current.emit('leave-room', { 
-            roomId,
-            username 
-          });
-        }
-        socketRef.current.disconnect();
-      }
-      
-      // Navigate to dashboard
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error closing room:', error);
-      
-      // Even if there's an error, still navigate away
-      navigate('/dashboard');
-    }
-  };
-  
-  // Function to handle beforeunload event
-  const handleBeforeUnload = async (e) => {
-    // Show a confirmation dialog to the user
-    const message = 'Are you sure you want to leave? Any unsaved changes will be lost.';
-    e.returnValue = message;
-    
-    return message;
-  };
-  
-  // Function to check if we're on mobile
-  const isMobile = () => window.innerWidth < 768;
-
-  // Add resize listener to update view on window resize
+  // Initialize room files (if needed) after joining
   useEffect(() => {
-    const handleResize = () => {
-      if (!isMobile()) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    handleResize(); // Initial check
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-  
-  // Load project data if this is an existing project
-  useEffect(() => {
-    // If this is an existing project, fetch the project data
-    if (isExistingProject && projectId) {
-      console.log(`Loading existing project (ID: ${projectId}) into room: ${roomId}`);
-      fetchProjectData(projectId);
-      
-      // Update document title to show it's an existing project
-      document.title = `Loading project... - ${roomId}`;
-    } else {
-      document.title = `Collaborative Editor - ${roomId}`;
-    }
-  }, [projectId, isExistingProject, roomId]);
-  
-  // Function to fetch project data
-  const fetchProjectData = async (projectId) => {
-    try {
-      setIsLoadingProject(true);
-      
-      // Get authentication token
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('No authentication token found');
-        return;
-      }
-      
-      console.log(`Fetching project data for project ID: ${projectId}`);
-      
-      // Fetch project details
-      const response = await axios.get(`${API_BASE_URL}/api/projects/${projectId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      
-      if (response.data) {
-        console.log('Project data loaded:', response.data);
-        
-        // Store project info
-        setProjectName(response.data.project.name || '');
-        setProjectDescription(response.data.project.description || '');
-        document.title = `${response.data.project.name || 'Project'} - ${roomId}`;
-        
-        // Load files from project
-        if (response.data.files && Array.isArray(response.data.files)) {
-          console.log('Project files found:', response.data.files.length);
-          setProjectFiles(response.data.files);
-          
-          // If there are files, select the first one to display in the editor
-          if (response.data.files.length > 0) {
-            const mainFile = response.data.files[0];
-            console.log('Setting main file:', mainFile);
-            setSelectedFile(mainFile);
-            setCode(mainFile.content || '// Start coding here');
-            
-            // If we have a language extension, set the editor language
-            if (mainFile.name) {
-              const extension = mainFile.name.split('.').pop().toLowerCase();
-              switch (extension) {
-                case 'js':
-                  setLanguage('javascript');
-                  break;
-                case 'py':
-                  setLanguage('python');
-                  break;
-                case 'java':
-                  setLanguage('java');
-                  break;
-                case 'cpp':
-                case 'c':
-                  setLanguage('cpp');
-                  break;
-                case 'html':
-                  setLanguage('html');
-                  break;
-                case 'css':
-                  setLanguage('css');
-                  break;
-                case 'json':
-                  setLanguage('json');
-                  break;
-                case 'md':
-                  setLanguage('markdown');
-                  break;
-                default:
-                  // Keep default language
-                  break;
-              }
+    if (isConnected && !isExistingProject && !isLoadingProject) {
+      console.log('Connected to room, ensuring it has files...');
+      // Wait a bit to make sure any socket events have been processed
+      const initTimer = setTimeout(() => {
+        ensureRoomHasFiles()
+          .then(files => {
+            console.log('Room initialization complete, files:', files);
+            // If we have files and none are selected, select the first one
+            if (files && files.length > 0 && !selectedFile) {
+              handleFileSelect(files[0]);
             }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching project data:', error);
-      alert(`Error loading project: ${error.response?.data?.message || error.message}`);
-    } finally {
-      setIsLoadingProject(false);
+          })
+          .catch(err => {
+            console.error('Error initializing room files:', err);
+          });
+      }, 2000);
+      
+      return () => clearTimeout(initTimer);
+    }
+  }, [isConnected, isExistingProject, isLoadingProject]);
+  
+  // We don't need separate useEffects to sync - using handleTabChange function instead
+  
+  // Function to handle tab changes without causing infinite loops
+  const handleTabChange = (tab) => {
+    console.log(`Changing tab to: ${tab} from previous tab: ${activeTab}`);
+    console.log(`Current showExplorer state: ${showExplorer}`);
+    
+    if (tab === 'explorer') {
+      console.log('Setting explorer to be visible...');
+      setActiveTab('explorer');
+      setShowExplorer(true);
+      activeTabRef.current = 'explorer';
+      
+      // Force a reflow to ensure DOM updates
+      setTimeout(() => {
+        console.log(`After state update - activeTab: ${activeTab}, showExplorer: ${showExplorer}`);
+      }, 100);
+    } else if (tab === 'editor') {
+      console.log('Setting editor to be visible...');
+      setActiveTab('editor');
+      setShowExplorer(false);
+      activeTabRef.current = 'editor';
     }
   };
+  
+  // Use effect to force re-render when activeTabRef changes
+  useEffect(() => {
+    console.log(`Tab ref changed to: ${activeTabRef.current}`);
+    // Forcing updates to ensure tab changes take effect
+    if (activeTabRef.current === 'explorer' && !showExplorer) {
+      console.log('Forcing explorer visibility from effect');
+      setShowExplorer(true);
+    }
+  }, [activeTabRef.current, showExplorer]);
   
   return (
     <div className="flex flex-col h-screen bg-[#14141B] text-white">
@@ -1754,33 +2170,29 @@ const EditorPage = () => {
             
             {/* Desktop buttons */}
             <div className="hidden md:flex items-center space-x-2">
-              <button
-                onClick={copyRoomId}
-                className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
-              >
-                <Share2 className="h-4 w-4 mr-1" />
-                Share
-              </button>
-              <button
-                onClick={() => {
-                  if (isExistingProject && projectId) {
-                    handleSaveProject(true);
-                  } else {
-                    setShowSaveModal(true);
-                  }
-                }}
-                className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
-              >
-                <FileText className="h-4 w-4 mr-1" />
-                Save
-              </button>
-              <button
-                onClick={closeRoom}
-                className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Close
-              </button>
+            <button
+              onClick={copyRoomId}
+              className="bg-[#4D5DFE] hover:bg-[#3A4AE1] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+            >
+              <Share2 className="h-4 w-4 mr-1" />
+              Share
+            </button>
+              {isExistingProject && projectId && (
+                <button
+                  onClick={updateExistingProject}
+                  className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Save
+                </button>
+              )}
+            <button
+              onClick={closeRoom}
+              className="bg-[#E94560] hover:bg-[#D32F4D] text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Close
+            </button>
               <button
                 onClick={closeRoomWithoutSave}
                 className="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded-md text-sm flex items-center transition-colors"
@@ -1833,13 +2245,21 @@ const EditorPage = () => {
               <Share2 className="h-4 w-4 mr-2" />
               Share Room
             </button>
+            {isExistingProject && projectId ? (
+              <button
+                onClick={() => {
+                  updateExistingProject();
+                  setShowMobileHeaderMenu(false);
+                }}
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Save Project
+              </button>
+            ) : (
                   <button 
               onClick={() => {
-                if (isExistingProject && projectId) {
-                  handleSaveProject(true);
-                } else {
-                  setShowSaveModal(true);
-                }
+                setShowSaveModal(true);
                 setShowMobileHeaderMenu(false);
               }}
               className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm flex items-center transition-colors"
@@ -1847,6 +2267,7 @@ const EditorPage = () => {
               <FileText className="h-4 w-4 mr-2" />
               Save Project
             </button>
+            )}
             <button
               onClick={() => {
                 closeRoomWithoutSave();
@@ -1877,7 +2298,7 @@ const EditorPage = () => {
             >
               <MessageSquare className="h-4 w-4 mr-2" />
               {showChat ? 'Close Chat' : 'Open Chat'}
-            </button>
+                  </button>
                 </div>
               </div>
             )}
@@ -2177,10 +2598,12 @@ const EditorPage = () => {
         )}
       </div>
       
-      {/* Mobile Layout with Tabs */}
+            {/* Mobile Layout content is now rendered below with no bottom navbar */}
+      
+      {/* Mobile Layout without bottom navbar */}
       <div className="md:hidden flex flex-col flex-1 overflow-hidden">
-        {/* Mobile file name indicator */}
-        {selectedFile && (
+        {/* Mobile file name indicator - only show in editor mode */}
+        {selectedFile && activeTabRef.current === 'editor' && (
           <div className="bg-[#1E1E29] px-4 py-2 text-sm truncate border-b border-[#2A2A3A]">
             <div className="flex items-center">
               <FileText size={14} className="mr-2 text-[#4D5DFE]" />
@@ -2189,24 +2612,55 @@ const EditorPage = () => {
           </div>
         )}
         
-        {renderMobileTabContent()}
+        {/* Explorer View Header - only show when explorer is active */}
+        {activeTabRef.current === 'explorer' && (
+          <div className="bg-[#1E1E29] px-4 py-2 flex justify-between items-center border-b border-[#2A2A3A] relative z-[100]" 
+               style={{ zIndex: 9999 }}>
+            <div className="flex items-center">
+              <Folder size={16} className="mr-2 text-yellow-400" />
+              <span className="font-medium">File Explorer</span>
+            </div>
+          <button
+              onClick={() => {
+                console.log('Close explorer clicked');
+                handleTabChange('editor');
+              }}
+              className="text-gray-400 hover:text-white p-1 bg-red-600 rounded-full"
+            >
+              <X size={18} />
+          </button>
+          </div>
+        )}
         
-        {/* Mobile Tabs Navigation - Simplified to just Editor and Explorer */}
-        <div className="flex border-t border-[#2A2A3A] bg-[#14141B]">
-          <button
-            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'editor' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
-            onClick={() => setActiveTab('editor')}
+        {/* Main Content Area - directly render both with visibility control */}
+        <div className="flex-1 overflow-hidden relative">
+          {/* Editor content */}
+          <div style={{ 
+            display: activeTabRef.current === 'editor' ? 'block' : 'none',
+            height: '100%'
+          }}>
+            {renderMobileEditorContent()}
+          </div>
+          
+          {/* Explorer content - always rendered but visibility controlled */}
+          <div 
+            id="mobile-explorer-content" 
+            className="h-full overflow-y-auto bg-[#14141B] absolute inset-0 z-50"
+            style={{ 
+              display: activeTabRef.current === 'explorer' ? 'block' : 'none',
+              zIndex: 9999
+            }}
           >
-            <Code size={22} />
-            <span className="text-xs mt-1">Editor</span>
-          </button>
-          <button
-            className={`flex-1 py-3 flex flex-col items-center justify-center ${activeTab === 'explorer' ? 'text-[#4D5DFE]' : 'text-gray-400'}`}
-            onClick={() => setActiveTab('explorer')}
-          >
-            <FileText size={22} />
-            <span className="text-xs mt-1">Explorer</span>
-          </button>
+            <FileExplorer 
+              roomId={roomId}
+              onFileSelect={(file) => {
+                handleFileSelect(file);
+                handleTabChange('editor');
+              }}
+              selectedFile={selectedFile}
+              initialFiles={isExistingProject ? projectFiles : undefined}
+            />
+          </div>
         </div>
       </div>
       
@@ -2236,7 +2690,7 @@ const EditorPage = () => {
                 ></textarea>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
-                <button
+          <button
                   onClick={cancelSaveProject}
                   className="px-4 py-2 bg-[#2A2A3A] text-white rounded-md hover:bg-[#3A3A4A]"
                   disabled={isSaving}
@@ -2266,9 +2720,9 @@ const EditorPage = () => {
                   ) : (
                     'Save Project'
                   )}
-                </button>
-              </div>
-            </div>
+          </button>
+        </div>
+      </div>
           </div>
         </div>
       )}

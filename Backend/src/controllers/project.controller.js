@@ -7,7 +7,7 @@ import mongoose from "mongoose";
 export const saveProject = async (req, res) => {
   try {
     const { roomId } = req.params;
-    const { name, description, tags, createdBy, projectId } = req.body;
+    const { name, description, tags, createdBy, fileIds } = req.body;
     const userId = req.userId; // From authentication middleware
     
     if (!roomId) {
@@ -42,8 +42,20 @@ export const saveProject = async (req, res) => {
       return res.status(403).json({ message: "Only the room creator can save the project" });
     }
     
-    // Get all files for the room
-    const files = await File.find({ roomId, isDeleted: false });
+    // Get files for the room - either use provided fileIds or fetch all files
+    let files;
+    if (fileIds && Array.isArray(fileIds) && fileIds.length > 0) {
+      console.log(`Using ${fileIds.length} explicitly provided file IDs`);
+      files = await File.find({ 
+        _id: { $in: fileIds },
+        isDeleted: false 
+      });
+      
+      console.log(`Found ${files.length} files from provided IDs`);
+    } else {
+      console.log('No file IDs provided, fetching all files for room');
+      files = await File.find({ roomId, isDeleted: false });
+    }
     
     if (files.length === 0) {
       return res.status(404).json({ message: "No files found for this room" });
@@ -52,34 +64,8 @@ export const saveProject = async (req, res) => {
     let project;
     let isNewProject = true;
     
-    // If explicit projectId is provided, try to update that project directly
-    if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
-      // Try to find the specified project
-      const existingProject = await Project.findById(projectId);
-      
-      if (existingProject && existingProject.hostId.toString() === userId) {
-        console.log(`Updating existing project by ID: ${existingProject._id} (${existingProject.name})`);
-        isNewProject = false;
-        
-        // Update the existing project
-        existingProject.name = name;
-        existingProject.description = description || existingProject.description;
-        existingProject.files = files.map(file => file._id);
-        existingProject.language = room.language;
-        if (tags) existingProject.tags = tags;
-        existingProject.lastAccessed = new Date();
-        existingProject.updatedAt = new Date();
-        
-        // Save the updated project
-        project = await existingProject.save();
-        console.log(`Project updated successfully: ${project._id}`);
-      } else {
-        console.log(`Project with ID ${projectId} not found or user doesn't have access.`);
-        return res.status(403).json({ message: "Project not found or you don't have permission to update it" });
-      }
-    } 
     // Check if this room was loaded from an existing project
-    else if (room.originalProjectId) {
+    if (room.originalProjectId) {
       // Try to find the original project
       const existingProject = await Project.findById(room.originalProjectId);
       
@@ -94,7 +80,6 @@ export const saveProject = async (req, res) => {
         existingProject.language = room.language;
         if (tags) existingProject.tags = tags;
         existingProject.lastAccessed = new Date();
-        existingProject.updatedAt = new Date();
         
         // Save the updated project
         project = await existingProject.save();
@@ -228,11 +213,15 @@ export const loadProjectToRoom = async (req, res) => {
       return res.status(403).json({ message: "You don't have permission to load this project" });
     }
     
+    console.log(`Loading project ${project._id} (${project.name}) with ${project.files?.length || 0} files`);
+    
     // Get all files for the project
     const projectFiles = await File.find({ 
       _id: { $in: project.files },
       isDeleted: false 
     });
+    
+    console.log(`Found ${projectFiles.length} files for project ${projectId}`);
     
     if (projectFiles.length === 0) {
       return res.status(404).json({ message: "No files found for this project" });
@@ -240,6 +229,8 @@ export const loadProjectToRoom = async (req, res) => {
     
     // Generate a new room ID
     const roomId = Math.random().toString(36).substring(2, 9);
+    
+    console.log(`Created new room ${roomId} for project ${projectId}`);
     
     // Create a new room with metadata about the original project
     const newRoom = new Room({
@@ -255,8 +246,12 @@ export const loadProjectToRoom = async (req, res) => {
     
     await newRoom.save();
     
+    console.log(`Creating ${projectFiles.length} files in the new room`);
+    
     // Create new files for the room based on project files
     const newFiles = await Promise.all(projectFiles.map(async (file) => {
+      console.log(`Creating file ${file.name} (${file.path}) in room ${roomId}`);
+      
       const newFile = new File({
         roomId,
         name: file.name,
@@ -271,6 +266,8 @@ export const loadProjectToRoom = async (req, res) => {
       await newFile.save();
       return { oldId: file._id.toString(), newFile };
     }));
+    
+    console.log(`Created ${newFiles.length} files in room ${roomId}`);
     
     // Create a map of old to new file IDs for updating parentIds
     const fileIdMap = newFiles.reduce((map, { oldId, newFile }) => {

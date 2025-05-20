@@ -58,6 +58,8 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile, initialFiles }) => {
   
   // Track if initialFiles are being used
   const [usingInitialFiles, setUsingInitialFiles] = useState(false);
+  // Store derived folders
+  const [derivedFolders, setDerivedFolders] = useState([]);
   
   const menuRef = useRef(null);
   const newItemInputRef = useRef(null);
@@ -175,22 +177,164 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile, initialFiles }) => {
     }
   };
 
+  // Ensure folder structure exists based on file paths
+  const ensureFolderStructure = (filesList) => {
+    console.log('Analyzing file paths to ensure folder structure...');
+    
+    // Map to track created folders to avoid duplicates
+    const folderMap = new Map();
+    const result = [...filesList];
+    
+    // First pass: collect all folders that already exist
+    filesList.forEach(file => {
+      if (file.type === 'folder') {
+        // Store with normalized path (both with and without leading slash)
+        const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+        folderMap.set(normalizedPath, file);
+        folderMap.set(normalizedPath.substring(1), file);
+        console.log(`Existing folder: ${file.name}, path: ${file.path}`);
+      }
+    });
+    
+    // Second pass: identify required folders from file paths
+    const requiredFolderPaths = new Set();
+    
+    filesList.forEach(file => {
+      if (file.type === 'file' && file.path) {
+        // Normalize path (ensure it starts with slash for consistent processing)
+        const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+        const pathParts = normalizedPath.split('/').filter(Boolean);
+        
+        // Skip if file is at root level
+        if (pathParts.length <= 1) return;
+        
+        // Log the file we're processing
+        console.log(`Processing file path: ${normalizedPath}`);
+        
+        // Identify all folder paths needed for this file
+        let currentPath = '';
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          currentPath = `${currentPath}/${pathParts[i]}`;
+          requiredFolderPaths.add(currentPath);
+        }
+      }
+    });
+    
+    console.log(`Required folder paths identified: ${Array.from(requiredFolderPaths).join(', ')}`);
+    
+    // Create synthetic folders for all required paths that don't exist
+    Array.from(requiredFolderPaths)
+      .sort((a, b) => a.split('/').length - b.split('/').length) // Process shallowest paths first
+      .forEach(folderPath => {
+        // Check if this folder or a variant already exists
+        const normalizedPath = folderPath.startsWith('/') ? folderPath : `/${folderPath}`;
+        const pathWithoutSlash = normalizedPath.substring(1);
+        
+        if (!folderMap.has(normalizedPath) && !folderMap.has(pathWithoutSlash)) {
+          const folderName = normalizedPath.split('/').filter(Boolean).pop();
+          
+          // Create synthetic folder
+          const syntheticFolder = {
+            _id: `folder_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            name: folderName,
+            type: 'folder',
+            path: normalizedPath,
+            content: '',
+            synthetic: true
+          };
+          
+          // Find parent folder if this is a nested folder
+          const lastSlashIndex = normalizedPath.lastIndexOf('/');
+          if (lastSlashIndex > 0) { // Has a parent (not root)
+            const parentPath = normalizedPath.substring(0, lastSlashIndex);
+            const parentPathWithoutSlash = parentPath.substring(1);
+            
+            // Look for parent with or without leading slash
+            const parentFolder = folderMap.get(parentPath) || folderMap.get(parentPathWithoutSlash);
+            
+            if (parentFolder) {
+              syntheticFolder.parentId = parentFolder._id;
+              console.log(`Assigned parent ${parentFolder.name} (${parentFolder._id}) to folder ${folderName}`);
+            } else {
+              console.log(`No parent found for ${folderName} at path ${parentPath}`);
+            }
+          }
+          
+          // Add to result and map
+          result.push(syntheticFolder);
+          folderMap.set(normalizedPath, syntheticFolder);
+          folderMap.set(pathWithoutSlash, syntheticFolder);
+          
+          console.log(`Created synthetic folder: ${folderName} with path ${normalizedPath}`);
+        } else {
+          console.log(`Folder already exists at ${normalizedPath}`);
+        }
+      });
+    
+    // Update derived folders state for reference
+    const newDerivedFolders = result.filter(file => !filesList.includes(file));
+    setDerivedFolders(newDerivedFolders);
+    
+    console.log(`Added ${newDerivedFolders.length} derived folders from file paths`);
+    
+    // After creating folders, set up parent-child relationships for all files
+    // This ensures files are correctly placed in their synthetic folders
+    const updatedFiles = result.map(file => {
+      if (file.type === 'file' && file.path && file.path.includes('/') && !file.parentId) {
+        // Find the parent folder for this file
+        const filePath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+        const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
+        const parentPathNoSlash = parentPath.substring(1);
+        
+        // Look for parent with or without leading slash
+        const parentFolder = folderMap.get(parentPath) || folderMap.get(parentPathNoSlash);
+        
+        if (parentFolder) {
+          // Clone the file to avoid mutating the original
+          const updatedFile = {...file, parentId: parentFolder._id};
+          console.log(`Assigned parent folder ${parentFolder.name} to file ${file.name}`);
+          return updatedFile;
+        }
+      }
+      return file;
+    });
+    
+    return updatedFiles;
+  };
+
   // Load files either from initialFiles or from API
   useEffect(() => {
     if (initialFiles && initialFiles.length > 0) {
       console.log('Initial files provided to FileExplorer:', initialFiles);
-      setFiles(initialFiles);
+      
+      // Log all file paths and relationships for debugging
+      initialFiles.forEach(file => {
+        console.log(`File: ${file.name}, Path: ${file.path}, Type: ${file.type}, ParentId: ${file.parentId || 'none'}`);
+      });
+      
+      // Ensure folder structure exists based on file paths
+      const filesWithFolders = ensureFolderStructure(initialFiles);
+      
+      setFiles(filesWithFolders);
       setLoading(false);
       setUsingInitialFiles(true);
       
-      // Expand root folders
+      // Expand all folders to show complete structure
       const expanded = {};
-      initialFiles.forEach(file => {
-        if (file.type === 'folder' && (!file.path || !file.path.includes('/'))) {
+      filesWithFolders.forEach(file => {
+        if (file.type === 'folder') {
           expanded[file._id] = true;
+          console.log(`Auto-expanding folder: ${file.name}`);
         }
       });
       setExpandedFolders(expanded);
+      
+      // Pre-select the first real file (not folder) to display in editor
+      const firstFile = initialFiles.find(file => file.type === 'file');
+      if (firstFile && onFileSelect) {
+        console.log(`Auto-selecting file: ${firstFile.name}`);
+        onFileSelect(firstFile);
+      }
     } else if (roomId) {
       console.log('No initial files, fetching from API');
       fetchFiles();
@@ -207,27 +351,201 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile, initialFiles }) => {
 
   // Build the file tree structure
   const buildFileTree = () => {
-    const rootItems = files.filter(file => !file.path.includes('/') || file.parentId === null);
-    return rootItems.sort((a, b) => {
-      // Folders first
-      if (a.type !== b.type) {
-        return a.type === 'folder' ? -1 : 1;
+    console.log('Building file tree with', files.length, 'files');
+    
+    // Check if files use parentId relationship or path-based relationships
+    const usesParentId = files.some(file => file.parentId);
+    console.log('File structure uses parentId relationships:', usesParentId);
+    
+    if (usesParentId) {
+      // Get root items (files/folders without a parent or with null parentId)
+      const rootItems = files.filter(file => 
+        !file.parentId || 
+        file.parentId === null || 
+        !files.some(f => f._id === file.parentId)
+      );
+      
+      console.log('Root items using parentId:', rootItems.map(item => `${item.name} (${item.type})`));
+      
+      // Check if we found any root items
+      if (rootItems.length === 0 && files.length > 0) {
+        console.warn('No root items found with parentId approach, may need to fall back to path-based approach');
       }
-      // Then alphabetically
-      return a.name.localeCompare(b.name);
-    });
+      
+      return rootItems.sort((a, b) => {
+        // Folders first
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
+        // Then alphabetically
+        return a.name.localeCompare(b.name);
+      });
+    } else {
+      // Path-based organization if parentId isn't used
+      // Look for items at root level (no slash or just one segment after slash)
+      const rootItems = files.filter(file => {
+        // Strip leading slash if present
+        const normalizedPath = file.path.startsWith('/') ? file.path.substring(1) : file.path;
+        
+        // Root items have no slashes in normalized path, or are directly at root level
+        return !normalizedPath.includes('/') || 
+               normalizedPath.split('/').length === 1 || 
+               file.path === '/' + file.name;
+      });
+      
+      console.log('Root items using path:', rootItems.map(item => `${item.name} (${item.type})`));
+      
+      // Check if we found any root items
+      if (rootItems.length === 0 && files.length > 0) {
+        console.warn('No root items found with path approach, will attempt to extract from file paths');
+        
+        // As a fallback, try to extract root level items from file paths
+        const rootItems = [];
+        const seenRootNames = new Set();
+        
+        files.forEach(file => {
+          if (file.path) {
+            // Normalize path
+            const normalizedPath = file.path.startsWith('/') ? file.path.substring(1) : file.path;
+            // Get the first segment of the path
+            const firstSegment = normalizedPath.split('/')[0];
+            
+            // If this is a root file, add it
+            if (normalizedPath === firstSegment) {
+              rootItems.push(file);
+              seenRootNames.add(file.name);
+            } 
+            // Otherwise check if we need to add a synthetic folder for this file
+            else if (firstSegment && !seenRootNames.has(firstSegment)) {
+              // Create a synthetic root folder
+              const syntheticFolder = {
+                _id: `root_folder_${firstSegment}_${Date.now()}`,
+                name: firstSegment,
+                type: 'folder',
+                path: `/${firstSegment}`,
+                synthetic: true
+              };
+              
+              rootItems.push(syntheticFolder);
+              seenRootNames.add(firstSegment);
+              console.log(`Created synthetic root folder: ${firstSegment}`);
+            }
+          }
+        });
+        
+        return rootItems.sort((a, b) => {
+          // Folders first
+          if (a.type !== b.type) {
+            return a.type === 'folder' ? -1 : 1;
+          }
+          // Then alphabetically
+          return a.name.localeCompare(b.name);
+        });
+      }
+      
+      return rootItems.sort((a, b) => {
+        // Folders first
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
+        // Then alphabetically
+        return a.name.localeCompare(b.name);
+      });
+    }
   };
 
   // Get children of a folder
   const getFolderChildren = (folderId) => {
-    return files
-      .filter(file => file.parentId && file.parentId.toString() === folderId.toString())
-      .sort((a, b) => {
+    const folder = files.find(file => file._id === folderId);
+    if (!folder) {
+      console.warn(`Folder with ID ${folderId} not found`);
+      return [];
+    }
+    
+    console.log(`Getting children for folder: ${folder.name}, path: ${folder.path}, id: ${folderId}`);
+    
+    // Try to find children using parentId reference first (more reliable)
+    const childrenById = files.filter(file => 
+      file.parentId && file.parentId.toString() === folderId.toString()
+    );
+    
+    if (childrenById.length > 0) {
+      console.log(`Found ${childrenById.length} children for folder ${folder.name} using parentId`);
+      return childrenById.sort((a, b) => {
         if (a.type !== b.type) {
           return a.type === 'folder' ? -1 : 1;
         }
         return a.name.localeCompare(b.name);
       });
+    }
+    
+    // Fallback to path-based lookup if parentId doesn't yield results
+    const parentPath = folder.path || '';
+    console.log(`Looking for children of ${folder.name} with path ${parentPath}`);
+    
+    // Normalize the parent path (ensure it has a leading slash)
+    const normalizedParentPath = parentPath.startsWith('/') ? parentPath : `/${parentPath}`;
+    
+    // Find direct children by path
+    const children = files.filter(file => {
+      if (file._id === folderId) return false; // Skip the parent itself
+      
+      // Normalize the file path
+      const filePath = file.path || '';
+      const normalizedFilePath = filePath.startsWith('/') ? filePath : `/${filePath}`;
+      
+      // Skip if the file path doesn't start with the parent path
+      if (!normalizedFilePath.startsWith(normalizedParentPath + '/')) {
+        return false;
+      }
+      
+      // Count path segments to ensure direct child relationship
+      const parentSegments = normalizedParentPath.split('/').filter(Boolean).length;
+      const fileSegments = normalizedFilePath.split('/').filter(Boolean).length;
+      
+      // A direct child has exactly one more path segment than its parent
+      return fileSegments === parentSegments + 1;
+    });
+    
+    console.log(`Found ${children.length} children for folder ${folder.name} using path`);
+    
+    // If still no children, try more aggressive path matching (for synthetic folders)
+    if (children.length === 0 && folder.synthetic) {
+      console.log(`Trying alternative path matching for synthetic folder ${folder.name}`);
+      
+      // Extract the folder name from path
+      const folderName = folder.name;
+      
+      const altChildren = files.filter(file => {
+        if (file._id === folderId) return false; // Skip the parent itself
+        if (file.parentId) return false; // Skip files already assigned to a parent
+        
+        const filePath = file.path || '';
+        const normalizedFilePath = filePath.startsWith('/') ? filePath : `/${filePath}`;
+        const pathParts = normalizedFilePath.split('/').filter(Boolean);
+        
+        // Check if this file is in a path that includes the folder name
+        return pathParts.length > 1 && pathParts[0] === folderName;
+      });
+      
+      console.log(`Found ${altChildren.length} children using alternative matching`);
+      
+      if (altChildren.length > 0) {
+        return altChildren.sort((a, b) => {
+          if (a.type !== b.type) {
+            return a.type === 'folder' ? -1 : 1;
+          }
+          return a.name.localeCompare(b.name);
+        });
+      }
+    }
+    
+    return children.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
   };
 
   // Toggle folder expansion
@@ -440,14 +758,26 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile, initialFiles }) => {
 
   // Render the file tree
   const renderFileTree = (items, level = 0) => {
-    return items.map(item => {
+    // Sort items: folders first, then files, alphabetically within each type
+    const sortedItems = [...items].sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return sortedItems.map(item => {
       const isFolder = item.type === 'folder';
       const isExpanded = expandedFolders[item._id];
       const isSelected = selectedFile && selectedFile._id === item._id;
       const isRenaming = renamingItem === item._id;
       
+      // Get children if this is a folder
+      const children = isFolder ? getFolderChildren(item._id) : [];
+      const hasChildren = children.length > 0;
+      
       return (
-        <div key={item._id} style={{ marginLeft: `${level * 12}px` }}>
+        <div key={item._id} style={{ marginLeft: `${level * 12}px` }} className="mb-0.5">
           <div 
             className={`flex items-center py-1.5 px-2 text-sm rounded-md cursor-pointer relative group transition-colors
               ${isSelected && !isFolder ? 'bg-blue-600 bg-opacity-90 text-white shadow-sm' : 
@@ -500,6 +830,17 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile, initialFiles }) => {
             ) : (
               <>
                 <span className="flex-1 truncate font-medium text-sm">{item.name}</span>
+                
+                {/* Show folder/file count for folders */}
+                {isFolder && hasChildren && (
+                  <span className="text-xs text-gray-500 mr-2">
+                    {children.filter(c => c.type === 'folder').length > 0 && 
+                      `${children.filter(c => c.type === 'folder').length} ${children.filter(c => c.type === 'folder').length === 1 ? 'folder' : 'folders'}`}
+                    {children.filter(c => c.type === 'folder').length > 0 && children.filter(c => c.type === 'file').length > 0 && ', '}
+                    {children.filter(c => c.type === 'file').length > 0 && 
+                      `${children.filter(c => c.type === 'file').length} ${children.filter(c => c.type === 'file').length === 1 ? 'file' : 'files'}`}
+                  </span>
+                )}
                 
                 <button 
                   className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white transition-opacity transition-colors"
@@ -559,7 +900,14 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile, initialFiles }) => {
           {/* Render folder children if expanded */}
           {isFolder && isExpanded && (
             <div className="animate-fadeIn">
-              {renderFileTree(getFolderChildren(item._id), level + 1)}
+              {renderFileTree(children, level + 1)}
+              
+              {/* If folder is empty, show a message */}
+              {children.length === 0 && (
+                <div style={{ marginLeft: `${(level + 1) * 12}px` }} className="py-1.5 px-2 text-sm text-gray-400 italic">
+                  Empty folder
+                </div>
+              )}
               
               {/* Form for new item inside this folder */}
               {newItemMode && newItemParent === item._id && (
@@ -575,14 +923,19 @@ const FileExplorer = ({ roomId, onFileSelect, selectedFile, initialFiles }) => {
                       type="text"
                       value={newItemName}
                       onChange={(e) => setNewItemName(e.target.value)}
-                      placeholder={`New ${newItemMode}`}
-                      className="flex-1 bg-gray-800 text-white text-sm py-0.5 px-1.5 outline-none border border-blue-500 rounded-md focus:ring-1 focus:ring-blue-500"
+                      placeholder={`New ${newItemMode}...`}
+                      className="flex-1 bg-transparent text-white text-sm py-0.5 px-1.5 outline-none border border-blue-500 rounded focus:ring-1 focus:ring-blue-500"
+                      onClick={(e) => e.stopPropagation()}
                     />
-                    <button type="submit" className="ml-1 text-green-400 hover:text-green-300 transition-colors">
+                    <button 
+                      type="submit"
+                      disabled={creating || !newItemName.trim()}
+                      className={`ml-1 text-green-400 hover:text-green-300 transition-colors ${creating || !newItemName.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
                       <Check className="w-4 h-4" />
                     </button>
                     <button 
-                      type="button" 
+                      type="button"
                       className="ml-1 text-red-400 hover:text-red-300 transition-colors"
                       onClick={handleCancelCreate}
                     >
